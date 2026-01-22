@@ -4,9 +4,10 @@
 mod storage_types;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, xdr::ToXdr, Bytes, BytesN, Env,
+    contract, contractimpl, panic_with_error, symbol_short, xdr::ToXdr, Address, Bytes, BytesN, Env,
+    Symbol, Vec,
 };
-pub use storage_types::{DataKey, MintPayload};
+pub use storage_types::{DataKey, MintPayload, PlanType, SavingsPlan, User};
 
 /// Custom error codes for the contract
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -172,6 +173,79 @@ impl NesteraContract {
     /// `true` if initialized, `false` otherwise
     pub fn is_initialized(env: Env) -> bool {
         env.storage().instance().has(&DataKey::Initialized)
+    }
+
+    pub fn create_savings_plan(
+        env: Env,
+        user: Address,
+        plan_type: PlanType,
+        initial_deposit: i128,
+    ) -> u64 {
+        if !Self::is_initialized(env.clone()) {
+            panic_with_error!(&env, ContractError::NotInitialized);
+        }
+
+        let mut user_data = Self::get_user(env.clone(), user.clone()).unwrap_or(User {
+            total_balance: 0,
+            savings_count: 0,
+        });
+
+        user_data.savings_count += 1;
+        user_data.total_balance += initial_deposit;
+
+        let plan_id = user_data.savings_count as u64;
+
+        let new_plan = SavingsPlan {
+            plan_id,
+            plan_type: plan_type.clone(),
+            balance: initial_deposit,
+            start_time: env.ledger().timestamp(),
+            last_deposit: env.ledger().timestamp(),
+            last_withdraw: 0,
+            interest_rate: 500, // Default 5%
+            is_completed: false,
+        };
+
+        // Store user data
+        env.storage().persistent().set(&DataKey::User(user.clone()), &user_data);
+
+        // Store plan data
+        env.storage()
+            .persistent()
+            .set(&DataKey::SavingsPlan(user.clone(), plan_id), &new_plan);
+
+        // Emit event
+        env.events().publish(
+            (Symbol::new(&env, "create_plan"), user, plan_id),
+            initial_deposit,
+        );
+
+        plan_id
+    }
+
+    pub fn get_savings_plan(env: Env, user: Address, plan_id: u64) -> Option<SavingsPlan> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::SavingsPlan(user, plan_id))
+    }
+
+    pub fn get_user_savings_plans(env: Env, user: Address) -> Vec<SavingsPlan> {
+        let user_data = Self::get_user(env.clone(), user.clone());
+        let mut plans = Vec::new(&env);
+
+        if let Some(data) = user_data {
+            for i in 1..=data.savings_count {
+                let plan_id = i as u64;
+                if let Some(plan) = Self::get_savings_plan(env.clone(), user.clone(), plan_id) {
+                    plans.push_back(plan);
+                }
+            }
+        }
+        plans
+    }
+
+    pub fn get_user(env: Env, user: Address) -> Option<User> {
+        env.storage().persistent().get(&DataKey::User(user))
     }
 }
 

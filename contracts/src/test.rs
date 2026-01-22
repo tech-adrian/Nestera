@@ -1,10 +1,10 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::{MintPayload, NesteraContract, NesteraContractClient};
+use crate::{MintPayload, NesteraContract, NesteraContractClient, PlanType, SavingsPlan, User};
 use ed25519_dalek::{Signer, SigningKey};
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
-use soroban_sdk::{xdr::ToXdr, Address, Bytes, BytesN, Env};
+use soroban_sdk::{xdr::ToXdr, Address, Bytes, BytesN, Env, Vec, symbol_short};
 
 /// Helper function to create a test environment and contract client
 fn setup_test_env() -> (Env, NesteraContractClient<'static>) {
@@ -468,4 +468,183 @@ fn test_multiple_mints_same_user() {
     let signature2 = sign_payload(&env, &signing_key, &payload2);
     let result2 = client.mint(&payload2, &signature2);
     assert_eq!(result2, 200_i128);
+}
+
+// =============================================================================
+// Savings Plan Tests
+// =============================================================================
+
+#[test]
+fn test_user_instantiation() {
+    let user = User {
+        total_balance: 1_000_000,
+        savings_count: 3,
+    };
+    
+    assert_eq!(user.total_balance, 1_000_000);
+    assert_eq!(user.savings_count, 3);
+}
+
+#[test]
+fn test_flexi_savings_plan() {
+    let plan = SavingsPlan {
+        plan_id: 1,
+        plan_type: PlanType::Flexi,
+        balance: 500_000,
+        start_time: 1000000,
+        last_deposit: 1000100,
+        last_withdraw: 0,
+        interest_rate: 500, // 5.00% APY
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 1);
+    assert_eq!(plan.plan_type, PlanType::Flexi);
+    assert_eq!(plan.balance, 500_000);
+    assert!(!plan.is_completed);
+}
+
+#[test]
+fn test_lock_savings_plan() {
+    let locked_until = 2000000;
+    let plan = SavingsPlan {
+        plan_id: 2,
+        plan_type: PlanType::Lock(locked_until),
+        balance: 1_000_000,
+        start_time: 1000000,
+        last_deposit: 1000000,
+        last_withdraw: 0,
+        interest_rate: 800,
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 2);
+    match plan.plan_type {
+        PlanType::Lock(until) => assert_eq!(until, locked_until),
+        _ => panic!("Expected Lock plan type"),
+    }
+}
+
+#[test]
+fn test_goal_savings_plan() {
+    let plan = SavingsPlan {
+        plan_id: 3,
+        plan_type: PlanType::Goal(
+            symbol_short!("education"),
+            5_000_000,
+            1u32, // e.g. 1 = weekly
+        ),
+        balance: 2_000_000,
+        start_time: 1000000,
+        last_deposit: 1500000,
+        last_withdraw: 0,
+        interest_rate: 600,
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 3);
+    match plan.plan_type {
+        PlanType::Goal(category, target_amount, contribution_type) => {
+            assert_eq!(category, symbol_short!("education"));
+            assert_eq!(target_amount, 5_000_000);
+            assert_eq!(contribution_type, 1u32);
+        },
+        _ => panic!("Expected Goal plan type"),
+    }
+}
+
+#[test]
+fn test_group_savings_plan() {
+    let plan = SavingsPlan {
+        plan_id: 4,
+        plan_type: PlanType::Group(
+            101,
+            true,
+            2u32,
+            10_000_000
+        ),
+        balance: 3_000_000,
+        start_time: 1000000,
+        last_deposit: 1600000,
+        last_withdraw: 0,
+        interest_rate: 700,
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 4);
+    match plan.plan_type {
+        PlanType::Group(group_id, is_public, contribution_type, target_amount) => {
+            assert_eq!(group_id, 101);
+            assert!(is_public);
+            assert_eq!(contribution_type, 2u32);
+            assert_eq!(target_amount, 10_000_000);
+        },
+        _ => panic!("Expected Group plan type"),
+    }
+}
+
+#[test]
+fn test_create_savings_plan() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+    
+    client.initialize(&admin_public_key);
+    
+    let user = Address::generate(&env);
+    let plan_type = PlanType::Flexi;
+    let initial_deposit = 1000_i128;
+    
+    let plan_id = client.create_savings_plan(&user, &plan_type, &initial_deposit);
+    assert_eq!(plan_id, 1);
+    
+    let plan = client.get_savings_plan(&user, &plan_id).unwrap();
+    assert_eq!(plan.plan_id, plan_id);
+    assert_eq!(plan.plan_type, plan_type);
+    assert_eq!(plan.balance, initial_deposit);
+}
+
+#[test]
+fn test_get_user_savings_plans() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+    
+    client.initialize(&admin_public_key);
+    
+    let user = Address::generate(&env);
+    
+    // Create multiple plans
+    let plan1_id = client.create_savings_plan(&user, &PlanType::Flexi, &1000_i128);
+    let plan2_id = client.create_savings_plan(&user, &PlanType::Lock(2000000), &2000_i128);
+    
+    let plans = client.get_user_savings_plans(&user);
+    assert_eq!(plans.len(), 2);
+    
+    // Verify plans are returned correctly
+    let mut plan_ids = std::vec::Vec::new();
+    for p in plans.iter() {
+        plan_ids.push(p.plan_id);
+    }
+    assert!(plan_ids.contains(&plan1_id));
+    assert!(plan_ids.contains(&plan2_id));
+}
+
+#[test]
+fn test_get_user() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+    
+    client.initialize(&admin_public_key);
+    
+    let user = Address::generate(&env);
+    
+    // User should not exist initially
+    assert!(client.get_user(&user).is_none());
+    
+    // Create a savings plan
+    client.create_savings_plan(&user, &PlanType::Flexi, &1000_i128);
+    
+    // User should now exist
+    let user_data = client.get_user(&user).unwrap();
+    assert_eq!(user_data.total_balance, 1000_i128);
+    assert_eq!(user_data.savings_count, 1);
 }
