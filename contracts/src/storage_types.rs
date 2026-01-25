@@ -42,6 +42,26 @@ impl User {
     }
 }
 
+/// Represents a group savings plan
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GroupSave {
+    pub id: u64,
+    pub creator: Address,
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    pub target_amount: i128,
+    pub current_amount: i128,
+    pub contribution_type: u8,
+    pub contribution_amount: i128,
+    pub is_public: bool,
+    pub member_count: u32,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub is_completed: bool,
+}
+
 /// Storage keys for the contract's persistent data
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,6 +74,12 @@ pub enum DataKey {
     SavingsPlan(Address, u64),
     FlexiBalance(Address),
     TotalBalance(Address),
+    /// Maps group ID to GroupSave struct
+    GroupSave(u64),
+    /// Maps user address to list of GroupSave IDs they participate in
+    UserGroupSaves(Address),
+    /// Stores the next auto-incrementing group ID
+    NextGroupId,
 }
 
 /// Payload structure that the admin signs off-chain
