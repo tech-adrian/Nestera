@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(lock_id, 1);
 
         // Verify the lock save was stored
-        let lock_save = client.get_lock_save(&lock_id);
+        let lock_save = client.get_lock_save_detail(&lock_id);
         assert_eq!(lock_save.id, lock_id);
         assert_eq!(lock_save.owner, user);
         assert_eq!(lock_save.amount, amount);
@@ -394,7 +394,7 @@ mod tests {
         assert!(amount >= 1000); // Should include some interest
 
         // Verify lock save is marked as withdrawn
-        let lock_save = client.get_lock_save(&lock_id);
+        let lock_save = client.get_lock_save_detail(&lock_id);
         assert!(lock_save.is_withdrawn);
     }
 

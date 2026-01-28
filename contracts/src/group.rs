@@ -116,6 +116,23 @@ pub fn create_group_save(
     // Add group_id to the creator's UserGroupSaves list
     add_group_to_user_list(env, &creator, group_id)?;
 
+    // Create a SavingsPlan for the creator so they can retrieve it via get_group_save
+    let now = env.ledger().timestamp();
+    let savings_plan = crate::storage_types::SavingsPlan {
+        plan_id: group_id,
+        plan_type: crate::storage_types::PlanType::Group(group_id, is_public, contribution_type, target_amount),
+        balance: 0,
+        start_time: now,
+        last_deposit: 0,
+        last_withdraw: 0,
+        interest_rate: 500, // Default 5%
+        is_completed: false,
+        is_withdrawn: false,
+    };
+    
+    let plan_key = DataKey::SavingsPlan(creator.clone(), group_id);
+    env.storage().persistent().set(&plan_key, &savings_plan);
+
     // Emit event for group creation
     env.events()
         .publish((soroban_sdk::symbol_short!("grp_new"), creator), group_id);
@@ -253,6 +270,23 @@ pub fn join_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), Sa
     let contribution_key = DataKey::GroupMemberContribution(group_id, user.clone());
     env.storage().persistent().set(&contribution_key, &0i128);
 
+    // Create a SavingsPlan for the joining user
+    let now = env.ledger().timestamp();
+    let savings_plan = crate::storage_types::SavingsPlan {
+        plan_id: group_id,
+        plan_type: crate::storage_types::PlanType::Group(group_id, group.is_public, group.contribution_type, group.target_amount),
+        balance: 0,
+        start_time: now,
+        last_deposit: 0,
+        last_withdraw: 0,
+        interest_rate: 500, // Default 5%
+        is_completed: group.is_completed,
+        is_withdrawn: false,
+    };
+    
+    let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
+    env.storage().persistent().set(&plan_key, &savings_plan);
+
     // Emit event for joining group
     env.events()
         .publish((soroban_sdk::symbol_short!("grp_join"), user), group_id);
@@ -337,6 +371,30 @@ pub fn contribute_to_group_save(
 
     // Save updated group
     env.storage().persistent().set(&group_key, &group);
+
+    // Update the user's SavingsPlan to reflect the new balance
+    let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
+    if let Some(mut plan) = env.storage().persistent().get::<DataKey, crate::storage_types::SavingsPlan>(&plan_key) {
+        plan.balance += amount;
+        plan.is_completed = group.is_completed;
+        plan.last_deposit = env.ledger().timestamp();
+        env.storage().persistent().set(&plan_key, &plan);
+    } else {
+        // If the user doesn't have a SavingsPlan yet (shouldn't happen for group members), create one
+        let now = env.ledger().timestamp();
+        let plan = crate::storage_types::SavingsPlan {
+            plan_id: group_id,
+            plan_type: crate::storage_types::PlanType::Group(group_id, group.is_public, group.contribution_type, group.target_amount),
+            balance: amount,
+            start_time: now,
+            last_deposit: now,
+            last_withdraw: 0,
+            interest_rate: 500,
+            is_completed: group.is_completed,
+            is_withdrawn: false,
+        };
+        env.storage().persistent().set(&plan_key, &plan);
+    }
 
     // Emit event for contribution
     env.events().publish(
