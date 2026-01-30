@@ -39,31 +39,39 @@ impl From<ContractError> for soroban_sdk::Error {
 #[contract]
 pub struct NesteraContract;
 
+pub(crate) fn ensure_not_paused(env: &Env) -> Result<(), SavingsError> {
+    let is_paused: bool = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Paused)
+        .unwrap_or(false);
+    if is_paused {
+        Err(SavingsError::ContractPaused)
+    } else {
+        Ok(())
+    }
+}
+
 #[contractimpl]
 impl NesteraContract {
     /// Initialize a new user in the system
     pub fn init_user(env: Env, user: Address) -> User {
-        user.require_auth();
-
-        let user_data = User {
-            total_balance: 0,
-            savings_count: 0,
-        };
-
-        let user_key = DataKey::User(user);
-        env.storage().persistent().set(&user_key, &user_data);
-
-        user_data
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
+        users::initialize_user(&env, user.clone()).unwrap_or_else(|e| panic_with_error!(&env, e));
+        users::get_user(&env, &user).unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
-    pub fn initialize(env: Env, admin_public_key: BytesN<32>) {
+    pub fn initialize(env: Env, admin: Address, admin_public_key: BytesN<32>) {
         if env.storage().instance().has(&DataKey::Initialized) {
             panic_with_error!(&env, ContractError::AlreadyInitialized);
         }
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage()
             .instance()
             .set(&DataKey::AdminPublicKey, &admin_public_key);
         env.storage().instance().set(&DataKey::Initialized, &true);
+        env.storage().persistent().set(&DataKey::Paused, &false);
         env.events()
             .publish((symbol_short!("init"),), admin_public_key);
     }
@@ -106,6 +114,7 @@ impl NesteraContract {
         plan_type: PlanType,
         initial_deposit: i128,
     ) -> u64 {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         if !Self::is_initialized(env.clone()) {
             panic_with_error!(&env, ContractError::NotInitialized);
         }
@@ -147,6 +156,7 @@ impl NesteraContract {
     }
 
     pub fn initialize_user(env: Env, user: Address) -> Result<(), SavingsError> {
+        ensure_not_paused(&env)?;
         users::initialize_user(&env, user)
     }
 
@@ -155,10 +165,12 @@ impl NesteraContract {
     }
 
     pub fn deposit_flexi(env: Env, user: Address, amount: i128) -> Result<(), SavingsError> {
+        ensure_not_paused(&env)?;
         flexi::flexi_deposit(env, user, amount)
     }
 
     pub fn withdraw_flexi(env: Env, user: Address, amount: i128) -> Result<(), SavingsError> {
+        ensure_not_paused(&env)?;
         flexi::flexi_withdraw(env, user, amount)
     }
 
@@ -169,12 +181,14 @@ impl NesteraContract {
     // --- Lock Save Logic ---
 
     pub fn create_lock_save(env: Env, user: Address, amount: i128, duration: u64) -> u64 {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         user.require_auth();
         lock::create_lock_save(&env, user, amount, duration)
             .unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     pub fn withdraw_lock_save(env: Env, user: Address, lock_id: u64) -> i128 {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         user.require_auth();
         lock::withdraw_lock_save(&env, user, lock_id).unwrap_or_else(|e| panic_with_error!(&env, e))
     }
@@ -196,21 +210,25 @@ impl NesteraContract {
         target_amount: i128,
         initial_deposit: i128,
     ) -> u64 {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         goal::create_goal_save(&env, user, goal_name, target_amount, initial_deposit)
             .unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     pub fn deposit_to_goal_save(env: Env, user: Address, goal_id: u64, amount: i128) {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         goal::deposit_to_goal_save(&env, user, goal_id, amount)
             .unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     pub fn withdraw_completed_goal_save(env: Env, user: Address, goal_id: u64) -> i128 {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         goal::withdraw_completed_goal_save(&env, user, goal_id)
             .unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     pub fn break_goal_save(env: Env, user: Address, goal_id: u64) {
+        ensure_not_paused(&env).unwrap_or_else(|e| panic_with_error!(&env, e));
         goal::break_goal_save(&env, user, goal_id).unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
@@ -238,6 +256,7 @@ impl NesteraContract {
         start_time: u64,
         end_time: u64,
     ) -> Result<u64, SavingsError> {
+        ensure_not_paused(&env)?;
         group::create_group_save(
             &env,
             creator,
@@ -254,6 +273,7 @@ impl NesteraContract {
     }
 
     pub fn join_group_save(env: Env, user: Address, group_id: u64) -> Result<(), SavingsError> {
+        ensure_not_paused(&env)?;
         group::join_group_save(&env, user, group_id)
     }
 
@@ -263,6 +283,7 @@ impl NesteraContract {
         group_id: u64,
         amount: i128,
     ) -> Result<(), SavingsError> {
+        ensure_not_paused(&env)?;
         group::contribute_to_group_save(&env, user, group_id, amount)
     }
 
@@ -296,7 +317,7 @@ impl NesteraContract {
         }
 
         env.storage().persistent().set(&DataKey::Paused, &true);
-        env.events().publish((symbol_short!("paused"),), admin); // Now this works!
+        env.events().publish((symbol_short!("pause"), admin), ());
         Ok(())
     }
 
@@ -310,7 +331,7 @@ impl NesteraContract {
         }
 
         env.storage().persistent().set(&DataKey::Paused, &false);
-        env.events().publish((symbol_short!("unpaused"),), admin);
+        env.events().publish((symbol_short!("unpause"), admin), ());
         Ok(())
     }
 

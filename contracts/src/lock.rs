@@ -1,5 +1,6 @@
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, LockSave, User};
+use crate::ensure_not_paused;
 use crate::users;
 use soroban_sdk::{symbol_short, Address, Env, Vec};
 
@@ -10,17 +11,8 @@ pub fn create_lock_save(
     amount: i128,
     duration: u64,
 ) -> Result<u64, SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
-
-    // Check if contract is paused
-    let is_paused: bool = env
-        .storage()
-        .persistent()
-        .get(&DataKey::Paused)
-        .unwrap_or(false);
-    if is_paused {
-        return Err(SavingsError::ContractPaused);
-    }
 
     // Validate inputs
     if amount <= 0 {
@@ -74,16 +66,8 @@ pub fn create_lock_save(
 }
 
 pub fn withdraw_lock_save(env: &Env, user: Address, lock_id: u64) -> Result<i128, SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
-
-    let is_paused: bool = env
-        .storage()
-        .persistent()
-        .get(&DataKey::Paused)
-        .unwrap_or(false);
-    if is_paused {
-        return Err(SavingsError::ContractPaused);
-    }
 
     let mut lock_save = get_lock_save(env, lock_id).ok_or(SavingsError::PlanNotFound)?;
 

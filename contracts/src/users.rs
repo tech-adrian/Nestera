@@ -2,6 +2,7 @@ use soroban_sdk::{Address, Env};
 
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, User};
+use crate::ensure_not_paused;
 
 /// Check if a user exists in storage
 ///
@@ -47,6 +48,7 @@ pub fn get_user(env: &Env, user: &Address) -> Result<User, SavingsError> {
 /// # Authorization
 /// Requires authorization from the user being initialized
 pub fn initialize_user(env: &Env, user: Address) -> Result<(), SavingsError> {
+    ensure_not_paused(env)?;
     // Require authorization from the user being initialized
     user.require_auth();
 

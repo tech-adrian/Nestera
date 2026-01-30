@@ -1,10 +1,13 @@
 // New/Correct
+use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, User};
 use soroban_sdk::{Address, Env};
 
 /// Handles depositing funds into the Flexi Save pool.
 pub fn flexi_deposit(env: Env, user: Address, amount: i128) -> Result<(), SavingsError> {
+    ensure_not_paused(&env)?;
+
     // 1. Verify the caller is the user
     user.require_auth();
 
@@ -39,6 +42,8 @@ pub fn flexi_deposit(env: Env, user: Address, amount: i128) -> Result<(), Saving
 
 /// Handles withdrawing funds from the Flexi Save pool.
 pub fn flexi_withdraw(env: Env, user: Address, amount: i128) -> Result<(), SavingsError> {
+    ensure_not_paused(&env)?;
+
     // 1. Verify the caller is the user
     user.require_auth();
 

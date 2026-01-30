@@ -1,5 +1,6 @@
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, GroupSave};
+use crate::ensure_not_paused;
 use crate::users;
 use soroban_sdk::{Address, Env, String, Vec};
 
@@ -42,6 +43,7 @@ pub fn create_group_save(
     start_time: u64,
     end_time: u64,
 ) -> Result<u64, SavingsError> {
+    ensure_not_paused(env)?;
     // Validate target_amount > 0
     if target_amount <= 0 {
         return Err(SavingsError::InvalidAmount);
@@ -225,6 +227,7 @@ fn add_group_to_user_list(env: &Env, user: &Address, group_id: u64) -> Result<()
 /// - Group is not public
 /// - User is already a member
 pub fn join_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), SavingsError> {
+    ensure_not_paused(env)?;
     // Ensure user exists
     if !users::user_exists(env, &user) {
         return Err(SavingsError::UserNotFound);
@@ -324,6 +327,7 @@ pub fn contribute_to_group_save(
     group_id: u64,
     amount: i128,
 ) -> Result<(), SavingsError> {
+    ensure_not_paused(env)?;
     // Validate amount > 0
     if amount <= 0 {
         return Err(SavingsError::InvalidAmount);

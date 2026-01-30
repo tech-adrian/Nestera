@@ -88,6 +88,7 @@ pub enum SavingsError {
     AlreadyWithdrawn = 6,
     Unauthorized = 7,
 }
+
 /// Represents a Goal Save plan with target amount
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

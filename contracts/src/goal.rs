@@ -1,5 +1,6 @@
 use soroban_sdk::{Address, Env, Vec};
 
+use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, GoalSave, User};
 use crate::users;
@@ -11,6 +12,7 @@ pub fn create_goal_save(
     target_amount: i128,
     initial_deposit: i128,
 ) -> Result<u64, SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
 
     if target_amount <= 0 {
@@ -56,6 +58,7 @@ pub fn deposit_to_goal_save(
     goal_id: u64,
     amount: i128,
 ) -> Result<(), SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
 
     if amount <= 0 {
@@ -93,6 +96,7 @@ pub fn withdraw_completed_goal_save(
     user: Address,
     goal_id: u64,
 ) -> Result<i128, SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
 
     if !users::user_exists(env, &user) {
@@ -132,6 +136,7 @@ pub fn withdraw_completed_goal_save(
 }
 
 pub fn break_goal_save(env: &Env, user: Address, goal_id: u64) -> Result<(), SavingsError> {
+    ensure_not_paused(env)?;
     user.require_auth();
 
     if !users::user_exists(env, &user) {
