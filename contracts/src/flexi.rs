@@ -2,10 +2,10 @@
 use crate::calculate_fee;
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
+use crate::invariants;
 use crate::storage_types::{DataKey, User};
 use crate::ttl;
 use soroban_sdk::{symbol_short, Address, Env};
-use crate::invariants;
 
 /// Handles depositing funds into the Flexi Save pool.
 pub fn flexi_deposit(env: Env, user: Address, amount: i128) -> Result<(), SavingsError> {
