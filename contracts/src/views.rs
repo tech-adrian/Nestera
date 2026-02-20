@@ -2,6 +2,7 @@ use crate::errors::SavingsError;
 use crate::storage_types::{
     DataKey, GoalSaveView, GroupSaveView, LockSaveView, PlanType, SavingsPlan, User,
 };
+use crate::ttl;
 use soroban_sdk::{Address, Env, Vec};
 
 // ===========================================================================
@@ -77,6 +78,9 @@ pub fn get_user_ongoing_lock_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(lock_save) = to_lock_save(&plan) {
                 // Ongoing means not withdrawn (and potentially check if locked_until > now,
                 // but "ongoing" usually implies active/fresh. Let's assume active = not withdrawn)
@@ -106,6 +110,9 @@ pub fn get_user_matured_lock_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(lock_save) = to_lock_save(&plan) {
                 // Matured means lock time has passed
                 if current_time >= lock_save.locked_until && !lock_save.is_withdrawn {
@@ -148,6 +155,9 @@ pub fn get_user_live_goal_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(goal_save) = to_goal_save(&plan) {
                 if !goal_save.is_completed {
                     live_plans.push_back(goal_save);
@@ -174,6 +184,9 @@ pub fn get_user_completed_goal_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(goal_save) = to_goal_save(&plan) {
                 if goal_save.is_completed {
                     completed_plans.push_back(goal_save);
@@ -191,6 +204,9 @@ pub fn get_goal_save(env: &Env, user: Address, goal_id: u64) -> Result<GoalSaveV
         .persistent()
         .get::<DataKey, SavingsPlan>(&key)
         .ok_or(SavingsError::PlanNotFound)?;
+
+    // Extend TTL on read
+    ttl::extend_plan_ttl(env, &key);
 
     to_goal_save(&plan).ok_or(SavingsError::PlanNotFound)
 }
@@ -215,6 +231,9 @@ pub fn get_user_live_group_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(group_save) = to_group_save(&plan) {
                 if !group_save.is_completed {
                     live_plans.push_back(group_save);
@@ -241,6 +260,9 @@ pub fn get_user_completed_group_saves(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let Some(group_save) = to_group_save(&plan) {
                 if group_save.is_completed {
                     completed_plans.push_back(group_save);
@@ -262,6 +284,9 @@ pub fn get_group_save(
         .persistent()
         .get::<DataKey, SavingsPlan>(&key)
         .ok_or(SavingsError::PlanNotFound)?;
+
+    // Extend TTL on read
+    ttl::extend_plan_ttl(env, &key);
 
     to_group_save(&plan).ok_or(SavingsError::PlanNotFound)
 }
@@ -309,6 +334,9 @@ pub fn get_group_member_contribution(
         let key = DataKey::SavingsPlan(user.clone(), plan_id);
 
         if let Some(plan) = env.storage().persistent().get::<DataKey, SavingsPlan>(&key) {
+            // Extend TTL on read
+            ttl::extend_plan_ttl(env, &key);
+
             if let PlanType::Group(valid_group_id, _, _, _) = plan.plan_type {
                 if valid_group_id == group_id {
                     return Ok(plan.balance);

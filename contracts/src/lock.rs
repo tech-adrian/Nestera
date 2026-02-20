@@ -1,6 +1,7 @@
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, LockSave, User};
+use crate::ttl;
 use crate::users;
 use soroban_sdk::{symbol_short, Address, Env, Vec};
 
@@ -12,7 +13,6 @@ pub fn create_lock_save(
     duration: u64,
 ) -> Result<u64, SavingsError> {
     ensure_not_paused(env)?;
-    user.require_auth();
 
     // Validate inputs
     if amount <= 0 {
@@ -62,12 +62,16 @@ pub fn create_lock_save(
     user_data.savings_count += 1;
     env.storage().persistent().set(&user_key, &user_data);
 
+    // Extend TTL for new lock save and user data
+    ttl::extend_lock_ttl(env, lock_id);
+    ttl::extend_user_ttl(env, &user);
+    ttl::extend_user_plan_list_ttl(env, &DataKey::UserLockSaves(user.clone()));
+
     Ok(lock_id)
 }
 
 pub fn withdraw_lock_save(env: &Env, user: Address, lock_id: u64) -> Result<i128, SavingsError> {
     ensure_not_paused(env)?;
-    user.require_auth();
 
     let mut lock_save = get_lock_save(env, lock_id).ok_or(SavingsError::PlanNotFound)?;
 
@@ -97,6 +101,10 @@ pub fn withdraw_lock_save(env: &Env, user: Address, lock_id: u64) -> Result<i128
         env.storage().persistent().set(&user_key, &user_data);
     }
 
+    // Extend TTL (completed locks get shorter extension)
+    ttl::extend_lock_ttl(env, lock_id);
+    ttl::extend_user_ttl(env, &user);
+
     env.events()
         .publish((symbol_short!("withdraw"), user, lock_id), final_amount);
 
@@ -105,6 +113,8 @@ pub fn withdraw_lock_save(env: &Env, user: Address, lock_id: u64) -> Result<i128
 
 pub fn check_matured_lock(env: &Env, lock_id: u64) -> bool {
     if let Some(lock_save) = get_lock_save(env, lock_id) {
+        // Extend TTL on check
+        ttl::extend_lock_ttl(env, lock_id);
         env.ledger().timestamp() >= lock_save.maturity_time
     } else {
         false
@@ -112,30 +122,51 @@ pub fn check_matured_lock(env: &Env, lock_id: u64) -> bool {
 }
 
 pub fn get_lock_save(env: &Env, lock_id: u64) -> Option<LockSave> {
-    env.storage().persistent().get(&DataKey::LockSave(lock_id))
+    let lock_save = env.storage().persistent().get(&DataKey::LockSave(lock_id));
+    if lock_save.is_some() {
+        // Extend TTL on read
+        ttl::extend_lock_ttl(env, lock_id);
+    }
+    lock_save
 }
 
 pub fn get_user_lock_saves(env: &Env, user: &Address) -> Vec<u64> {
-    env.storage()
+    let list_key = DataKey::UserLockSaves(user.clone());
+    let locks = env
+        .storage()
         .persistent()
-        .get(&DataKey::UserLockSaves(user.clone()))
-        .unwrap_or_else(|| Vec::new(env))
+        .get(&list_key)
+        .unwrap_or_else(|| Vec::new(env));
+
+    // Extend TTL on list access
+    if locks.len() > 0 {
+        ttl::extend_user_plan_list_ttl(env, &list_key);
+    }
+
+    locks
 }
 
 // --- Internal Helper Functions ---
 
 fn get_next_lock_id(env: &Env) -> u64 {
-    env.storage()
-        .persistent()
-        .get(&DataKey::NextLockId)
-        .unwrap_or(1)
+    let counter_key = DataKey::NextLockId;
+    let id = env.storage().persistent().get(&counter_key).unwrap_or(1);
+
+    // Extend TTL on counter access
+    ttl::extend_counter_ttl(env, &counter_key);
+
+    id
 }
 
 fn increment_next_lock_id(env: &Env) {
     let current_id = get_next_lock_id(env);
+    let counter_key = DataKey::NextLockId;
     env.storage()
         .persistent()
-        .set(&DataKey::NextLockId, &(current_id + 1));
+        .set(&counter_key, &(current_id + 1));
+
+    // Extend TTL on counter update
+    ttl::extend_counter_ttl(env, &counter_key);
 }
 
 fn add_lock_to_user(env: &Env, user: &Address, lock_id: u64) {

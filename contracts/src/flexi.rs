@@ -3,6 +3,7 @@ use crate::calculate_fee;
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, User};
+use crate::ttl;
 use soroban_sdk::{symbol_short, Address, Env};
 
 /// Handles depositing funds into the Flexi Save pool.
@@ -51,6 +52,9 @@ pub fn flexi_deposit(env: Env, user: Address, amount: i128) -> Result<(), Saving
     } else {
         return Err(SavingsError::UserNotFound);
     }
+
+    // Extend TTL on user interaction
+    ttl::extend_user_ttl(&env, &user);
 
     // 6. Transfer fee to treasury if fee > 0
     if fee_amount > 0 {
@@ -126,6 +130,9 @@ pub fn flexi_withdraw(env: Env, user: Address, amount: i128) -> Result<(), Savin
         env.storage().persistent().set(&user_key, &user_data);
     }
 
+    // Extend TTL on user interaction
+    ttl::extend_user_ttl(&env, &user);
+
     // 6. Transfer fee to treasury if fee > 0
     if fee_amount > 0 {
         if let Some(fee_recipient) = env
@@ -162,8 +169,11 @@ pub fn get_flexi_balance(env: &Env, user: Address) -> Result<i128, SavingsError>
         .ok_or(SavingsError::UserNotFound)?;
 
     // 2. Read flexi balance (default to 0)
-    let flexi_key = DataKey::FlexiBalance(user);
+    let flexi_key = DataKey::FlexiBalance(user.clone());
     let balance = env.storage().persistent().get(&flexi_key).unwrap_or(0i128);
+
+    // Extend TTL on read
+    ttl::extend_user_ttl(env, &user);
 
     Ok(balance)
 }
@@ -171,8 +181,11 @@ pub fn get_flexi_balance(env: &Env, user: Address) -> Result<i128, SavingsError>
 /// Returns true if the user has a non-zero Flexi Save balance.
 /// This function does not mutate storage.
 pub fn has_flexi_balance(env: &Env, user: Address) -> bool {
-    let flexi_key = DataKey::FlexiBalance(user);
+    let flexi_key = DataKey::FlexiBalance(user.clone());
     let balance = env.storage().persistent().get(&flexi_key).unwrap_or(0i128);
+
+    // Extend TTL on read
+    ttl::extend_user_ttl(env, &user);
 
     balance > 0
 }

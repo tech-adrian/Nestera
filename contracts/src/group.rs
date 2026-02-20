@@ -1,6 +1,7 @@
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, GroupSave};
+use crate::ttl;
 use crate::users;
 use soroban_sdk::{Address, Env, String, Vec};
 
@@ -140,6 +141,12 @@ pub fn create_group_save(
     let plan_key = DataKey::SavingsPlan(creator.clone(), group_id);
     env.storage().persistent().set(&plan_key, &savings_plan);
 
+    // Extend TTL for new group, members list, and user data
+    ttl::extend_group_ttl(env, group_id);
+    ttl::extend_user_plan_list_ttl(env, &DataKey::UserGroupSaves(creator.clone()));
+    ttl::extend_counter_ttl(env, &next_id_key);
+    ttl::extend_plan_ttl(env, &plan_key);
+
     // Emit event for group creation
     env.events()
         .publish((soroban_sdk::symbol_short!("grp_new"), creator), group_id);
@@ -157,7 +164,12 @@ pub fn create_group_save(
 /// `Some(GroupSave)` if the group exists, `None` otherwise
 pub fn get_group_save(env: &Env, group_id: u64) -> Option<GroupSave> {
     let key = DataKey::GroupSave(group_id);
-    env.storage().persistent().get(&key)
+    let group = env.storage().persistent().get(&key);
+    if group.is_some() {
+        // Extend TTL on read
+        ttl::extend_group_ttl(env, group_id);
+    }
+    group
 }
 
 /// Checks if a group exists.
@@ -170,7 +182,12 @@ pub fn get_group_save(env: &Env, group_id: u64) -> Option<GroupSave> {
 /// `true` if the group exists, `false` otherwise
 pub fn group_exists(env: &Env, group_id: u64) -> bool {
     let key = DataKey::GroupSave(group_id);
-    env.storage().persistent().has(&key)
+    let exists = env.storage().persistent().has(&key);
+    if exists {
+        // Extend TTL on check
+        ttl::extend_group_ttl(env, group_id);
+    }
+    exists
 }
 
 /// Gets all group IDs that a user participates in.
@@ -183,10 +200,18 @@ pub fn group_exists(env: &Env, group_id: u64) -> bool {
 /// A vector of group IDs the user is involved in
 pub fn get_user_groups(env: &Env, user: &Address) -> Vec<u64> {
     let key = DataKey::UserGroupSaves(user.clone());
-    env.storage()
+    let groups = env
+        .storage()
         .persistent()
         .get(&key)
-        .unwrap_or(Vec::new(env))
+        .unwrap_or(Vec::new(env));
+
+    // Extend TTL on list access
+    if groups.len() > 0 {
+        ttl::extend_user_plan_list_ttl(env, &key);
+    }
+
+    groups
 }
 
 /// Helper function to add a group ID to a user's list of groups.
@@ -208,6 +233,9 @@ fn add_group_to_user_list(env: &Env, user: &Address, group_id: u64) -> Result<()
 
     groups.push_back(group_id);
     env.storage().persistent().set(&key, &groups);
+
+    // Extend TTL on list update
+    ttl::extend_user_plan_list_ttl(env, &key);
 
     Ok(())
 }
@@ -299,6 +327,11 @@ pub fn join_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), Sa
 
     let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
     env.storage().persistent().set(&plan_key, &savings_plan);
+
+    // Extend TTL for group and user data
+    ttl::extend_group_ttl(env, group_id);
+    ttl::extend_user_ttl(env, &user);
+    ttl::extend_plan_ttl(env, &plan_key);
 
     // Emit event for joining group
     env.events()
@@ -418,6 +451,11 @@ pub fn contribute_to_group_save(
         };
         env.storage().persistent().set(&plan_key, &plan);
     }
+
+    // Extend TTL on contribution
+    ttl::extend_group_ttl(env, group_id);
+    ttl::extend_user_ttl(env, &user);
+    ttl::extend_plan_ttl(env, &plan_key);
 
     // Emit event for contribution
     env.events().publish(
@@ -599,6 +637,9 @@ pub fn break_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), S
     // Delete user's SavingsPlan for this group
     let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
     env.storage().persistent().remove(&plan_key);
+
+    // Extend TTL for group (still active for other members)
+    ttl::extend_group_ttl(env, group_id);
 
     // Emit event for leaving group
     env.events().publish(

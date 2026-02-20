@@ -4,6 +4,7 @@ use crate::calculate_fee;
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, GoalSave, User};
+use crate::ttl;
 use crate::users;
 
 pub fn create_goal_save(
@@ -86,6 +87,10 @@ pub fn create_goal_save(
     add_goal_to_user(env, &user, goal_id);
     increment_next_goal_id(env);
 
+    // Extend TTL for new goal save and user data
+    ttl::extend_goal_ttl(env, goal_id);
+    ttl::extend_user_plan_list_ttl(env, &DataKey::UserGoalSaves(user.clone()));
+
     Ok(goal_id)
 }
 
@@ -136,6 +141,10 @@ pub fn deposit_to_goal_save(
     env.storage()
         .persistent()
         .set(&DataKey::GoalSave(goal_id), &goal_save);
+
+    // Extend TTL on deposit
+    ttl::extend_goal_ttl(env, goal_id);
+    ttl::extend_user_ttl(env, &user);
 
     // Transfer fee to treasury if fee > 0
     if fee_amount > 0 {
@@ -217,6 +226,10 @@ pub fn withdraw_completed_goal_save(
             .ok_or(SavingsError::Overflow)?;
         env.storage().persistent().set(&user_key, &user_data);
     }
+
+    // Extend TTL (withdrawn goals get shorter extension)
+    ttl::extend_goal_ttl(env, goal_id);
+    ttl::extend_user_ttl(env, &user);
 
     // Transfer fee to treasury if fee > 0
     if fee_amount > 0 {
@@ -323,6 +336,10 @@ pub fn break_goal_save(env: &Env, user: Address, goal_id: u64) -> Result<i128, S
                 .checked_add(fee_amount)
                 .ok_or(SavingsError::Overflow)?;
             env.storage().persistent().set(&fee_key, &new_fee_balance);
+
+            // Extend TTL on fee storage
+            ttl::extend_config_ttl(env, &fee_key);
+
             env.events().publish(
                 (symbol_short!("brk_fee"), fee_recipient, goal_id),
                 fee_amount,
@@ -337,32 +354,57 @@ pub fn break_goal_save(env: &Env, user: Address, goal_id: u64) -> Result<i128, S
 
     remove_goal_from_user(env, &user, goal_id);
 
+    // Extend TTL (withdrawn goals get shorter extension)
+    ttl::extend_goal_ttl(env, goal_id);
+    ttl::extend_user_ttl(env, &user);
+
     Ok(net_amount)
 }
 
 pub fn get_goal_save(env: &Env, goal_id: u64) -> Option<GoalSave> {
-    env.storage().persistent().get(&DataKey::GoalSave(goal_id))
+    let goal_save = env.storage().persistent().get(&DataKey::GoalSave(goal_id));
+    if goal_save.is_some() {
+        // Extend TTL on read
+        ttl::extend_goal_ttl(env, goal_id);
+    }
+    goal_save
 }
 
 pub fn get_user_goal_saves(env: &Env, user: &Address) -> Vec<u64> {
-    env.storage()
+    let list_key = DataKey::UserGoalSaves(user.clone());
+    let goals = env
+        .storage()
         .persistent()
-        .get(&DataKey::UserGoalSaves(user.clone()))
-        .unwrap_or_else(|| Vec::new(env))
+        .get(&list_key)
+        .unwrap_or_else(|| Vec::new(env));
+
+    // Extend TTL on list access
+    if goals.len() > 0 {
+        ttl::extend_user_plan_list_ttl(env, &list_key);
+    }
+
+    goals
 }
 
 fn get_next_goal_id(env: &Env) -> u64 {
-    env.storage()
-        .persistent()
-        .get(&DataKey::NextGoalId)
-        .unwrap_or(1u64)
+    let counter_key = DataKey::NextGoalId;
+    let id = env.storage().persistent().get(&counter_key).unwrap_or(1u64);
+
+    // Extend TTL on counter access
+    ttl::extend_counter_ttl(env, &counter_key);
+
+    id
 }
 
 fn increment_next_goal_id(env: &Env) {
     let current_id = get_next_goal_id(env);
+    let counter_key = DataKey::NextGoalId;
     env.storage()
         .persistent()
-        .set(&DataKey::NextGoalId, &(current_id + 1));
+        .set(&counter_key, &(current_id + 1));
+
+    // Extend TTL on counter update
+    ttl::extend_counter_ttl(env, &counter_key);
 }
 
 fn add_goal_to_user(env: &Env, user: &Address, goal_id: u64) {
