@@ -3,6 +3,7 @@ use soroban_sdk::{symbol_short, Address, Env, Vec};
 use crate::calculate_fee;
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
+use crate::rewards::storage;
 use crate::storage_types::{DataKey, GoalSave, User};
 use crate::ttl;
 use crate::users;
@@ -59,6 +60,10 @@ pub fn create_goal_save(
     env.storage()
         .persistent()
         .set(&DataKey::GoalSave(goal_id), &goal_save);
+
+    if goal_save.is_completed {
+        storage::award_goal_completion_bonus(env, user.clone())?;
+    }
 
     // Transfer fee to treasury if fee > 0
     if fee_amount > 0 {
@@ -134,6 +139,7 @@ pub fn deposit_to_goal_save(
         .checked_add(net_amount)
         .ok_or(SavingsError::Overflow)?;
 
+    let was_completed = goal_save.is_completed;
     if goal_save.current_amount >= goal_save.target_amount {
         goal_save.is_completed = true;
     }
@@ -141,6 +147,10 @@ pub fn deposit_to_goal_save(
     env.storage()
         .persistent()
         .set(&DataKey::GoalSave(goal_id), &goal_save);
+
+    if !was_completed && goal_save.is_completed {
+        storage::award_goal_completion_bonus(env, user.clone())?;
+    }
 
     // Extend TTL on deposit
     ttl::extend_goal_ttl(env, goal_id);
@@ -434,8 +444,13 @@ fn remove_goal_from_user(env: &Env, user: &Address, goal_id: u64) {
 
 #[cfg(test)]
 mod tests {
+    use crate::rewards::storage_types::RewardsConfig;
     use crate::{NesteraContract, NesteraContractClient};
-    use soroban_sdk::{testutils::Address as _, Address, Env, Symbol};
+    use soroban_sdk::{
+        symbol_short,
+        testutils::{Address as _, Events as _},
+        Address, BytesN, Env, IntoVal, Symbol,
+    };
 
     fn setup_test_env() -> (Env, NesteraContractClient<'static>) {
         let env = Env::default();
@@ -455,6 +470,67 @@ mod tests {
         client.initialize(&admin, &admin_pk);
 
         (env, client, admin)
+    }
+
+    fn setup_rewards_with(
+        client: &NesteraContractClient<'_>,
+        env: &Env,
+        enabled: bool,
+        completion_bonus: u32,
+    ) {
+        let admin = Address::generate(env);
+        let admin_pk = BytesN::from_array(env, &[2u8; 32]);
+
+        env.mock_all_auths();
+        client.initialize(&admin, &admin_pk);
+
+        let config = RewardsConfig {
+            points_per_token: 10,
+            streak_bonus_bps: 0,
+            long_lock_bonus_bps: 0,
+            goal_completion_bonus: completion_bonus,
+            enabled,
+        };
+        assert!(client.try_initialize_rewards_config(&config).is_ok());
+    }
+
+    fn setup_rewards(client: &NesteraContractClient<'_>, env: &Env) {
+        setup_rewards_with(client, env, true, 250);
+    }
+
+    fn has_bonus_event(env: &Env, user: &Address, reason: soroban_sdk::Symbol, points: u128) -> bool {
+        let expected_topics =
+            (Symbol::new(env, "BonusAwarded"), user.clone(), reason).into_val(env);
+        let expected_data = points.into_val(env);
+        let contract_id = env.current_contract_address();
+        let events = env.events().all();
+
+        for i in 0..events.len() {
+            if let Some((event_contract, topics, data)) = events.get(i) {
+                if event_contract == contract_id && topics == expected_topics && data == expected_data
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn bonus_event_count(env: &Env, user: &Address, reason: soroban_sdk::Symbol) -> u32 {
+        let expected_topics =
+            (Symbol::new(env, "BonusAwarded"), user.clone(), reason).into_val(env);
+        let contract_id = env.current_contract_address();
+        let events = env.events().all();
+        let mut count = 0u32;
+
+        for i in 0..events.len() {
+            if let Some((event_contract, topics, _data)) = events.get(i) {
+                if event_contract == contract_id && topics == expected_topics {
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     #[test]
@@ -880,5 +956,102 @@ mod tests {
         let goal_save = client.get_goal_save_detail(&goal_id);
         assert_eq!(goal_save.current_amount, 50);
         assert_eq!(client.get_protocol_fee_balance(&treasury), 0);
+    }
+
+    #[test]
+    fn test_goal_completion_bonus_awarded_once_on_deposit_transition() {
+        let (env, client) = setup_test_env();
+        setup_rewards(&client, &env);
+        let user = Address::generate(&env);
+
+        env.mock_all_auths();
+        client.initialize_user(&user);
+
+        let goal_name = Symbol::new(&env, "bonusgoal");
+        let goal_id = client.create_goal_save(&user, &goal_name, &5_000, &4_000);
+
+        client.deposit_to_goal_save(&user, &goal_id, &1_000);
+        let rewards_after_completion = client.get_user_rewards(&user);
+        assert_eq!(rewards_after_completion.total_points, 250);
+        assert!(has_bonus_event(&env, &user, symbol_short!("goal"), 250));
+
+        let _ = client.withdraw_completed_goal_save(&user, &goal_id);
+        let rewards_after_withdraw = client.get_user_rewards(&user);
+        assert_eq!(rewards_after_withdraw.total_points, 250);
+        assert_eq!(bonus_event_count(&env, &user, symbol_short!("goal")), 1);
+    }
+
+    #[test]
+    fn test_goal_completion_bonus_not_awarded_below_target_boundary() {
+        let (env, client) = setup_test_env();
+        setup_rewards(&client, &env);
+        let user = Address::generate(&env);
+
+        env.mock_all_auths();
+        client.initialize_user(&user);
+
+        let goal_name = Symbol::new(&env, "nobonus");
+        let goal_id = client.create_goal_save(&user, &goal_name, &5_000, &4_999);
+        let goal_save = client.get_goal_save_detail(&goal_id);
+        assert!(!goal_save.is_completed);
+
+        let rewards = client.get_user_rewards(&user);
+        assert_eq!(rewards.total_points, 0);
+        assert_eq!(bonus_event_count(&env, &user, symbol_short!("goal")), 0);
+    }
+
+    #[test]
+    fn test_goal_completion_bonus_awarded_on_create_if_target_reached() {
+        let (env, client) = setup_test_env();
+        setup_rewards(&client, &env);
+        let user = Address::generate(&env);
+
+        env.mock_all_auths();
+        client.initialize_user(&user);
+
+        let goal_name = Symbol::new(&env, "instant");
+        let goal_id = client.create_goal_save(&user, &goal_name, &5_000, &5_000);
+        let goal = client.get_goal_save_detail(&goal_id);
+        assert!(goal.is_completed);
+
+        let rewards = client.get_user_rewards(&user);
+        assert_eq!(rewards.total_points, 250);
+        assert!(has_bonus_event(&env, &user, symbol_short!("goal"), 250));
+        assert_eq!(bonus_event_count(&env, &user, symbol_short!("goal")), 1);
+    }
+
+    #[test]
+    fn test_goal_completion_bonus_not_awarded_when_rewards_disabled() {
+        let (env, client) = setup_test_env();
+        setup_rewards_with(&client, &env, false, 250);
+        let user = Address::generate(&env);
+
+        env.mock_all_auths();
+        client.initialize_user(&user);
+
+        let goal_name = Symbol::new(&env, "disabled");
+        let _goal_id = client.create_goal_save(&user, &goal_name, &5_000, &5_000);
+
+        let rewards = client.get_user_rewards(&user);
+        assert_eq!(rewards.total_points, 0);
+        assert_eq!(bonus_event_count(&env, &user, symbol_short!("goal")), 0);
+    }
+
+    #[test]
+    fn test_goal_break_does_not_award_completion_bonus() {
+        let (env, client) = setup_test_env();
+        setup_rewards(&client, &env);
+        let user = Address::generate(&env);
+
+        env.mock_all_auths();
+        client.initialize_user(&user);
+
+        let goal_name = Symbol::new(&env, "breakcase");
+        let goal_id = client.create_goal_save(&user, &goal_name, &10_000, &2_000);
+        let _ = client.break_goal_save(&user, &goal_id);
+
+        let rewards = client.get_user_rewards(&user);
+        assert_eq!(rewards.total_points, 0);
+        assert_eq!(bonus_event_count(&env, &user, symbol_short!("goal")), 0);
     }
 }

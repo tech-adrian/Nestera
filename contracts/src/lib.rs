@@ -569,6 +569,37 @@ impl NesteraContract {
             .unwrap_or(0)
     }
 
+    // ========== Rewards Functions ==========
+
+    pub fn initialize_rewards_config(
+        env: Env,
+        config: rewards::storage_types::RewardsConfig,
+    ) -> Result<(), SavingsError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(SavingsError::Unauthorized)?;
+        admin.require_auth();
+        rewards::config::initialize_rewards_config(&env, config)
+    }
+
+    pub fn update_rewards_config(
+        env: Env,
+        admin: Address,
+        config: rewards::storage_types::RewardsConfig,
+    ) -> Result<(), SavingsError> {
+        rewards::config::update_rewards_config(&env, admin, config)
+    }
+
+    pub fn get_rewards_config(env: Env) -> Result<rewards::storage_types::RewardsConfig, SavingsError> {
+        rewards::config::get_rewards_config(&env)
+    }
+
+    pub fn get_user_rewards(env: Env, user: Address) -> rewards::storage_types::UserRewards {
+        rewards::storage::get_user_rewards(&env, user)
+    }
+
     // ========== AutoSave Functions ==========
 
     /// Creates a new AutoSave schedule for recurring Flexi deposits

@@ -2,7 +2,10 @@ use super::storage_types::{RewardsDataKey, UserRewards};
 use crate::errors::SavingsError;
 use crate::rewards::config::get_rewards_config;
 use crate::rewards::storage_types::RewardsConfig;
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env, Symbol};
+
+/// Duration threshold for long-lock bonus eligibility (in seconds).
+pub const LONG_LOCK_BONUS_THRESHOLD_SECS: u64 = 180 * 24 * 60 * 60;
 
 /// Fetches user rewards or returns a default empty state
 pub fn get_user_rewards(env: &Env, user: Address) -> UserRewards {
@@ -109,4 +112,64 @@ pub fn award_deposit_points(env: &Env, user: Address, amount: i128) -> Result<()
     );
 
     Ok(())
+}
+
+/// Awards bonus points for long lock plans when duration exceeds the configured threshold.
+pub fn award_long_lock_bonus(
+    env: &Env,
+    user: Address,
+    amount: i128,
+    duration: u64,
+) -> Result<u128, SavingsError> {
+    if amount <= 0 || duration <= LONG_LOCK_BONUS_THRESHOLD_SECS {
+        return Ok(0);
+    }
+
+    let config = match get_rewards_config(env) {
+        Ok(config) if config.enabled => config,
+        _ => return Ok(0),
+    };
+
+    if config.long_lock_bonus_bps == 0 || config.points_per_token == 0 {
+        return Ok(0);
+    }
+
+    let base_points = (amount as u128)
+        .checked_mul(config.points_per_token as u128)
+        .ok_or(SavingsError::Overflow)?;
+    let bonus_points = base_points
+        .checked_mul(config.long_lock_bonus_bps as u128)
+        .ok_or(SavingsError::Overflow)?
+        / 10_000u128;
+
+    if bonus_points == 0 {
+        return Ok(0);
+    }
+
+    add_points(env, user.clone(), bonus_points)?;
+    env.events().publish(
+        (Symbol::new(env, "BonusAwarded"), user, symbol_short!("lock")),
+        bonus_points,
+    );
+    Ok(bonus_points)
+}
+
+/// Awards a fixed goal completion bonus when a goal reaches its target.
+pub fn award_goal_completion_bonus(env: &Env, user: Address) -> Result<u128, SavingsError> {
+    let config = match get_rewards_config(env) {
+        Ok(config) if config.enabled => config,
+        _ => return Ok(0),
+    };
+
+    if config.goal_completion_bonus == 0 {
+        return Ok(0);
+    }
+
+    let bonus_points = config.goal_completion_bonus as u128;
+    add_points(env, user.clone(), bonus_points)?;
+    env.events().publish(
+        (Symbol::new(env, "BonusAwarded"), user, symbol_short!("goal")),
+        bonus_points,
+    );
+    Ok(bonus_points)
 }
