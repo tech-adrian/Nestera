@@ -7,3 +7,4 @@ target
 
 # Test outputs
 contracts/test_snapshots/
+PR_DESCRIPTION.md
