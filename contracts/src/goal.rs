@@ -446,7 +446,10 @@ fn remove_goal_from_user(env: &Env, user: &Address, goal_id: u64) {
 mod tests {
     use crate::rewards::storage_types::RewardsConfig;
     use crate::{NesteraContract, NesteraContractClient};
-    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Symbol};
+    use soroban_sdk::{
+        testutils::{Address as _, Events},
+        Address, BytesN, Env, IntoVal, Symbol,
+    };
 
     fn setup_test_env() -> (Env, NesteraContractClient<'static>) {
         let env = Env::default();
@@ -492,6 +495,48 @@ mod tests {
 
     fn setup_rewards(client: &NesteraContractClient<'_>, env: &Env) {
         setup_rewards_with(client, env, true, 250);
+    }
+
+    fn has_bonus_event(
+        env: &Env,
+        user: &Address,
+        reason: soroban_sdk::Symbol,
+        points: u128,
+    ) -> bool {
+        let expected_topics =
+            (Symbol::new(env, "BonusAwarded"), user.clone(), reason).into_val(env);
+        let expected_data = points.into_val(env);
+        let contract_id = env.current_contract_address();
+        let events = env.events().all();
+
+        for i in 0..events.len() {
+            if let Some((event_contract, topics, data)) = events.get(i) {
+                if event_contract == contract_id
+                    && topics == expected_topics
+                    && data.shallow_eq(&expected_data)
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn bonus_event_count(env: &Env, user: &Address, reason: soroban_sdk::Symbol) -> u32 {
+        let expected_topics =
+            (Symbol::new(env, "BonusAwarded"), user.clone(), reason).into_val(env);
+        let contract_id = env.current_contract_address();
+        let events = env.events().all();
+        let mut count = 0u32;
+
+        for i in 0..events.len() {
+            if let Some((event_contract, topics, _data)) = events.get(i) {
+                if event_contract == contract_id && topics == expected_topics {
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     #[test]
