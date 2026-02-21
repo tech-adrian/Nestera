@@ -196,8 +196,8 @@ mod tests {
     use crate::rewards::storage_types::RewardsConfig;
     use crate::{NesteraContract, NesteraContractClient};
     use soroban_sdk::{
-        testutils::{Address as _, Ledger},
-        Address, BytesN, Env,
+        testutils::{Address as _, Events, Ledger},
+        Address, BytesN, Env, IntoVal, Symbol,
     };
 
     fn setup_env_with_rewards_enabled(
@@ -244,7 +244,7 @@ mod tests {
             if let Some((event_contract, topics, data)) = events.get(i) {
                 if event_contract == contract_id
                     && topics == expected_topics
-                    && data == expected_data
+                    && data.shallow_eq(&expected_data)
                 {
                     return true;
                 }

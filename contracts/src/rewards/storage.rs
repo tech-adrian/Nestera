@@ -1,3 +1,4 @@
+//! Rewards storage, streak logic, and bonus point calculations.
 use super::storage_types::{RewardsDataKey, UserRewards};
 use crate::errors::SavingsError;
 use crate::rewards::config::get_rewards_config;
@@ -252,7 +253,7 @@ pub fn award_goal_completion_bonus(env: &Env, user: Address) -> Result<u128, Sav
 
 #[cfg(test)]
 mod tests {
-    use super::{STREAK_BONUS_THRESHOLD, STREAK_WINDOW_SECS};
+    use super::STREAK_WINDOW_SECS;
     use crate::rewards::storage_types::RewardsConfig;
     use crate::{NesteraContract, NesteraContractClient, PlanType};
     use soroban_sdk::{
