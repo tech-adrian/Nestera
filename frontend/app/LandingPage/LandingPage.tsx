@@ -1,6 +1,7 @@
 import React from 'react';
 import Hero from '../sections/Hero/Hero';
 import HowItWorks from '../sections/HowItWorks/HowItWorks';
+import SavingsProducts from '../components/SavingsProducts';
 import FAQ from '../components/FAQ';
 
 const LandingPage: React.FC = () => {
@@ -16,6 +17,7 @@ const LandingPage: React.FC = () => {
         stat={{ label: 'Annual Yield', value: '12% APY' }}
       />
       <HowItWorks />
+      <SavingsProducts />
       <FAQ />
     </main>
   );
