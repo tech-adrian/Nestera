@@ -4,6 +4,9 @@ import Hero from '../sections/Hero/Hero';
 import HowItWorks from '../components/HowItWorks';
 import FAQ from '../components/FAQ';
 
+import Footer from '../components/Footer';
+
+
 import React from "react";
 import Hero from "../sections/Hero/Hero";
 import SavingsProducts from "../components/SavingsProducts";
@@ -25,12 +28,15 @@ const LandingPage: React.FC = () => {
       />
 
       <HowItWorks />
+      <FAQ />
+      <Footer />
 
 
       <SavingsProducts />
 
       <FAQ />
       <Newsletter />
+
     </main>
   );
 };

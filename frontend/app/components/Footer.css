@@ -1,0 +1,239 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+.footer {
+  width: 100%;
+  background: #061a1a;
+  font-family: 'Inter', sans-serif;
+  padding: 64px 48px 32px;
+  position: relative;
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  pointer-events: none;
+}
+
+.footer__container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Top row ── */
+.footer__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+
+.footer__brand {
+  flex: 0 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer__logo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  transition: opacity 0.2s ease;
+}
+
+.footer__logo-link:hover {
+  opacity: 0.9;
+}
+
+.footer__logo-link:focus-visible {
+  outline: 2px solid #00d4c0;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.footer__logo-icon {
+  color: #00d4c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.footer__logo-text {
+  line-height: 1;
+}
+
+.footer__tagline {
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: rgba(180, 210, 210, 0.75);
+  max-width: 280px;
+}
+
+/* ── Link columns ── */
+.footer__links {
+  display: flex;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+
+.footer__column {
+  min-width: 120px;
+}
+
+.footer__column-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 16px;
+  line-height: 1.2;
+}
+
+.footer__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer__link {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: rgba(180, 210, 210, 0.8);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer__link:hover {
+  color: #00d4c0;
+}
+
+.footer__link:focus-visible {
+  outline: 2px solid #00d4c0;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Divider ── */
+.footer__divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 32px 0 24px;
+}
+
+/* ── Bottom row ── */
+.footer__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer__bottom-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.footer__copyright {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: rgba(180, 210, 210, 0.65);
+  margin: 0;
+}
+
+.footer__socials {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer__social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.footer__social:hover {
+  color: #00d4c0;
+  transform: translateY(-2px);
+}
+
+.footer__social:focus-visible {
+  outline: 2px solid #00d4c0;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Responsive: single-column / stacked on mobile ── */
+@media (max-width: 768px) {
+  .footer {
+    padding: 48px 24px 24px;
+  }
+
+  .footer__top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 32px;
+  }
+
+  .footer__brand {
+    flex: none;
+    max-width: 100%;
+  }
+
+  .footer__tagline {
+    max-width: 100%;
+  }
+
+  .footer__links {
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .footer__column {
+    min-width: 0;
+  }
+
+  .footer__divider {
+    margin: 24px 0 20px;
+  }
+
+  .footer__bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .footer__bottom-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer {
+    padding: 40px 20px 20px;
+  }
+}
