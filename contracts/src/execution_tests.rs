@@ -38,10 +38,14 @@ mod execution_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Test proposal");
+        
+        client.initialize_user(&creator);
+        let _ = client.create_savings_plan(&creator, &PlanType::Flexi, &1000); // Meets threshold
+
         let action = ProposalAction::SetFlexiRate(500);
         let proposal_id = client
             .try_create_action_proposal(&creator, &description, &action)
@@ -96,10 +100,14 @@ mod execution_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Test proposal");
+
+        client.initialize_user(&creator);
+        let _ = client.create_savings_plan(&creator, &PlanType::Flexi, &1000);
+
         let action = ProposalAction::SetFlexiRate(500);
         let proposal_id = client
             .try_create_action_proposal(&creator, &description, &action)
@@ -225,11 +233,15 @@ mod execution_tests {
         env.mock_all_auths();
 
         // Setup governance
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         // Create proposal
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Change flexi rate");
+
+        client.initialize_user(&creator);
+        let _ = client.create_savings_plan(&creator, &PlanType::Flexi, &1000);
+
         let action = ProposalAction::SetFlexiRate(750);
         let proposal_id = client
             .try_create_action_proposal(&creator, &description, &action)
@@ -274,10 +286,14 @@ mod execution_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Pause contract");
+
+        client.initialize_user(&creator);
+        let _ = client.create_savings_plan(&creator, &PlanType::Flexi, &1000);
+
         let action = ProposalAction::PauseContract;
         let proposal_id = client
             .try_create_action_proposal(&creator, &description, &action)

@@ -764,11 +764,15 @@ impl NesteraContract {
         quorum: u32,
         voting_period: u64,
         timelock_duration: u64,
+        proposal_threshold: u128,
+        max_voting_power: u128,
     ) -> Result<(), SavingsError> {
         let config = governance::VotingConfig {
             quorum,
             voting_period,
             timelock_duration,
+            proposal_threshold,
+            max_voting_power,
         };
         governance::init_voting_config(&env, admin, config)
     }

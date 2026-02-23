@@ -41,6 +41,8 @@ pub struct VotingConfig {
     pub quorum: u32,
     pub voting_period: u64,
     pub timelock_duration: u64,
+    pub proposal_threshold: u128,
+    pub max_voting_power: u128,
 }
 
 #[contracttype]
@@ -130,6 +132,10 @@ pub fn create_action_proposal(
     creator.require_auth();
 
     let config = get_voting_config(env)?;
+    if get_voting_power(env, &creator) < config.proposal_threshold {
+        return Err(SavingsError::InsufficientBalance);
+    }
+    
     let proposal_id = get_next_proposal_id(env);
     let now = env.ledger().timestamp();
 
@@ -222,6 +228,10 @@ pub fn init_voting_config(
         return Err(SavingsError::ConfigAlreadyInitialized);
     }
 
+    if config.voting_period == 0 || config.timelock_duration == 0 || config.max_voting_power == 0 {
+        return Err(SavingsError::InvalidAmount);
+    }
+
     env.storage()
         .persistent()
         .set(&GovernanceKey::VotingConfig, &config);
@@ -258,6 +268,9 @@ pub fn vote(
     if weight == 0 {
         return Err(SavingsError::InsufficientBalance);
     }
+    
+    let config = get_voting_config(env)?;
+    let capped_weight = weight.min(config.max_voting_power);
 
     // Check for double voting
     let voter_key = GovernanceKey::VoterRecord(proposal_id, voter.clone());
@@ -278,19 +291,19 @@ pub fn vote(
             1 => {
                 proposal.for_votes = proposal
                     .for_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             2 => {
                 proposal.against_votes = proposal
                     .against_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             3 => {
                 proposal.abstain_votes = proposal
                     .abstain_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             _ => return Err(SavingsError::InvalidAmount),
@@ -323,19 +336,19 @@ pub fn vote(
             1 => {
                 proposal.for_votes = proposal
                     .for_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             2 => {
                 proposal.against_votes = proposal
                     .against_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             3 => {
                 proposal.abstain_votes = proposal
                     .abstain_votes
-                    .checked_add(weight)
+                    .checked_add(capped_weight)
                     .ok_or(SavingsError::Overflow)?;
             }
             _ => return Err(SavingsError::InvalidAmount),
@@ -487,14 +500,14 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
             return Err(SavingsError::TooEarly);
         }
 
-        // Execute the action
-        execute_action(env, &proposal.action)?;
-
-        // Mark as executed
+        // Mark as executed first to prevent re-entrancy
         proposal.executed = true;
         env.storage()
             .persistent()
             .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+
+        // Execute the action
+        execute_action(env, &proposal.action)?;
 
         // Emit event
         emit_proposal_executed(env, proposal_id, now);
@@ -524,7 +537,7 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
             return Err(SavingsError::TooEarly);
         }
 
-        // Mark as executed
+        // Mark as executed first
         proposal.executed = true;
         env.storage()
             .persistent()

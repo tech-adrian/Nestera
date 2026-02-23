@@ -97,7 +97,7 @@ mod governance_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let result = client.try_init_voting_config(&admin, &5000, &604800, &86400);
+        let result = client.try_init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
         assert!(result.is_ok());
 
         let config = client.try_get_voting_config().unwrap().unwrap();
@@ -111,7 +111,7 @@ mod governance_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Test proposal");
@@ -128,7 +128,7 @@ mod governance_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Test proposal");
@@ -150,7 +150,7 @@ mod governance_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let desc1 = String::from_str(&env, "Proposal 1");
@@ -170,7 +170,7 @@ mod governance_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Store test");

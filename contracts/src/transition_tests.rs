@@ -2,7 +2,7 @@
 mod transition_tests {
     use crate::governance::{ProposalAction, VotingConfig};
     use crate::rewards::storage_types::RewardsConfig;
-    use crate::{NesteraContract, NesteraContractClient};
+    use crate::{NesteraContract, NesteraContractClient, PlanType};
     use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
 
     fn setup_contract() -> (Env, NesteraContractClient<'static>, Address) {
@@ -88,10 +88,14 @@ mod transition_tests {
         let (env, client, admin) = setup_contract();
         env.mock_all_auths();
 
-        let _ = client.init_voting_config(&admin, &5000, &604800, &86400);
+        let _ = client.init_voting_config(&admin, &5000, &604800, &86400, &100, &10_000);
 
         let creator = Address::generate(&env);
         let description = String::from_str(&env, "Set flexi rate to 500");
+        
+        client.initialize_user(&creator);
+        let _ = client.create_savings_plan(&creator, &PlanType::Flexi, &1000);
+
         let action = ProposalAction::SetFlexiRate(500);
 
         let proposal_id = client
