@@ -11,6 +11,7 @@ mod errors;
 mod flexi;
 mod goal;
 mod governance;
+mod governance_events;
 mod group;
 mod invariants;
 mod lock;
