@@ -1,6 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Horizon, Networks, rpc } from '@stellar/stellar-sdk';
+import {
+  Asset,
+  Horizon,
+  Keypair,
+  Networks,
+  rpc,
+  Transaction,
+  xdr,
+} from '@stellar/stellar-sdk';
 
 @Injectable()
 export class StellarService implements OnModuleInit {
@@ -52,5 +61,13 @@ export class StellarService implements OnModuleInit {
     this.logger.log(`Querying contract ${contractId}, method ${method}`);
     // return this.rpcServer.simulateTransaction(...)
     return Promise.resolve();
+  }
+
+  generateKeypair(): { publicKey: string; secretKey: string } {
+    const keypair = Keypair.random();
+    return {
+      publicKey: keypair.publicKey(),
+      secretKey: keypair.secret(),
+    };
   }
 }

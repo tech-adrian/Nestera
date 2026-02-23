@@ -13,4 +13,10 @@ export const envValidationSchema = Joi.object({
   HORIZON_URL: Joi.string().uri().required(),
   CONTRACT_ID: Joi.string().required(),
   REDIS_URL: Joi.string().uri().optional(),
+
+  MAIL_HOST: Joi.string().optional(),
+  MAIL_PORT: Joi.number().port().default(587).optional(),
+  MAIL_USER: Joi.string().optional(),
+  MAIL_PASS: Joi.string().optional(),
+  MAIL_FROM: Joi.string().optional(),
 });

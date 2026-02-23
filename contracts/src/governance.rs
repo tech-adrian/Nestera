@@ -1,4 +1,5 @@
 use crate::errors::SavingsError;
+use crate::governance_events::*;
 use crate::rewards::storage::get_user_rewards;
 use crate::storage_types::DataKey;
 use soroban_sdk::{contracttype, Address, Env, String, Vec};
@@ -114,10 +115,7 @@ pub fn create_proposal(
         .persistent()
         .set(&GovernanceKey::NextProposalId, &(proposal_id + 1));
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("proposal"), creator, proposal_id),
-        (),
-    );
+    emit_proposal_created(env, proposal_id, creator, proposal.description.clone());
 
     Ok(proposal_id)
 }
@@ -167,10 +165,7 @@ pub fn create_action_proposal(
         .persistent()
         .set(&GovernanceKey::NextProposalId, &(proposal_id + 1));
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("proposal"), creator, proposal_id),
-        (),
-    );
+    emit_proposal_created(env, proposal_id, creator, proposal.description.clone());
 
     Ok(proposal_id)
 }
@@ -310,10 +305,7 @@ pub fn vote(
         env.storage().persistent().set(&voter_key, &true);
 
         // Emit VoteCast event
-        env.events().publish(
-            (soroban_sdk::symbol_short!("vote_cast"), voter, proposal_id),
-            (vote_type, weight),
-        );
+        emit_vote_cast(env, proposal_id, voter, vote_type, weight);
 
         return Ok(());
     }
@@ -358,10 +350,7 @@ pub fn vote(
         env.storage().persistent().set(&voter_key, &true);
 
         // Emit VoteCast event
-        env.events().publish(
-            (soroban_sdk::symbol_short!("vote_cast"), voter, proposal_id),
-            (vote_type, weight),
-        );
+        emit_vote_cast(env, proposal_id, voter, vote_type, weight);
 
         return Ok(());
     }
@@ -420,8 +409,7 @@ pub fn queue_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError> {
             .persistent()
             .set(&GovernanceKey::Proposal(proposal_id), &proposal);
 
-        env.events()
-            .publish((soroban_sdk::symbol_short!("queued"), proposal_id), now);
+        emit_proposal_queued(env, proposal_id, now);
 
         return Ok(());
     }
@@ -464,8 +452,7 @@ pub fn queue_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError> {
             .persistent()
             .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
 
-        env.events()
-            .publish((soroban_sdk::symbol_short!("queued"), proposal_id), now);
+        emit_proposal_queued(env, proposal_id, now);
 
         return Ok(());
     }
@@ -510,8 +497,7 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
             .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
 
         // Emit event
-        env.events()
-            .publish((soroban_sdk::symbol_short!("executed"), proposal_id), now);
+        emit_proposal_executed(env, proposal_id, now);
 
         return Ok(());
     }
@@ -545,8 +531,7 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
             .set(&GovernanceKey::Proposal(proposal_id), &proposal);
 
         // Emit event
-        env.events()
-            .publish((soroban_sdk::symbol_short!("executed"), proposal_id), now);
+        emit_proposal_executed(env, proposal_id, now);
 
         return Ok(());
     }
