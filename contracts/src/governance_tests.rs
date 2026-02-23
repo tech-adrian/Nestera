@@ -75,7 +75,7 @@ mod governance_tests {
 
         client.initialize_user(&user);
 
-        let result = client.try_cast_vote(&user, &1, &true);
+        let result = client.try_vote(&1, &1, &user);
         assert!(result.is_err());
     }
 
@@ -88,8 +88,8 @@ mod governance_tests {
         client.initialize_user(&user);
         let _ = client.create_savings_plan(&user, &PlanType::Flexi, &1000);
 
-        let result = client.try_cast_vote(&user, &1, &true);
-        assert!(result.is_ok());
+        let result = client.try_vote(&1, &1, &user);
+        assert!(result.is_err());
     }
 
     #[test]

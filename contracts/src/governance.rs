@@ -49,6 +49,7 @@ pub enum GovernanceKey {
     VotingConfig,
     AllProposals,
     GovernanceActive,
+    VoterRecord(u64, Address),
 }
 
 #[contracttype]
@@ -240,25 +241,134 @@ fn get_next_proposal_id(env: &Env) -> u64 {
 }
 
 /// Casts a weighted vote on a proposal
-pub fn cast_vote(
+pub fn vote(
     env: &Env,
-    user: Address,
     proposal_id: u64,
-    support: bool,
+    vote_type: u32,
+    voter: Address,
 ) -> Result<(), SavingsError> {
-    user.require_auth();
-    let weight = get_voting_power(env, &user);
+    voter.require_auth();
 
+    // Validate vote_type: 1=for, 2=against, 3=abstain
+    if vote_type < 1 || vote_type > 3 {
+        return Err(SavingsError::InvalidAmount);
+    }
+
+    // Check voter has sufficient governance weight
+    let weight = get_voting_power(env, &voter);
     if weight == 0 {
         return Err(SavingsError::InsufficientBalance);
     }
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("vote"), user, proposal_id),
-        (support, weight),
-    );
+    // Check for double voting
+    let voter_key = GovernanceKey::VoterRecord(proposal_id, voter.clone());
+    if env.storage().persistent().has(&voter_key) {
+        return Err(SavingsError::DuplicatePlanId);
+    }
 
-    Ok(())
+    // Try to get regular proposal first
+    if let Some(mut proposal) = get_proposal(env, proposal_id) {
+        // Validate voting within active period
+        let now = env.ledger().timestamp();
+        if now < proposal.start_time || now > proposal.end_time {
+            return Err(SavingsError::TooLate);
+        }
+
+        // Update vote tallies
+        match vote_type {
+            1 => {
+                proposal.for_votes = proposal
+                    .for_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            2 => {
+                proposal.against_votes = proposal
+                    .against_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            3 => {
+                proposal.abstain_votes = proposal
+                    .abstain_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            _ => return Err(SavingsError::InvalidAmount),
+        }
+
+        // Save updated proposal
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::Proposal(proposal_id), &proposal);
+
+        // Record voter to prevent double voting
+        env.storage().persistent().set(&voter_key, &true);
+
+        // Emit VoteCast event
+        env.events().publish(
+            (soroban_sdk::symbol_short!("vote_cast"), voter, proposal_id),
+            (vote_type, weight),
+        );
+
+        return Ok(());
+    }
+
+    // Try action proposal
+    if let Some(mut proposal) = get_action_proposal(env, proposal_id) {
+        // Validate voting within active period
+        let now = env.ledger().timestamp();
+        if now < proposal.start_time || now > proposal.end_time {
+            return Err(SavingsError::TooLate);
+        }
+
+        // Update vote tallies
+        match vote_type {
+            1 => {
+                proposal.for_votes = proposal
+                    .for_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            2 => {
+                proposal.against_votes = proposal
+                    .against_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            3 => {
+                proposal.abstain_votes = proposal
+                    .abstain_votes
+                    .checked_add(weight)
+                    .ok_or(SavingsError::Overflow)?;
+            }
+            _ => return Err(SavingsError::InvalidAmount),
+        }
+
+        // Save updated proposal
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+
+        // Record voter to prevent double voting
+        env.storage().persistent().set(&voter_key, &true);
+
+        // Emit VoteCast event
+        env.events().publish(
+            (soroban_sdk::symbol_short!("vote_cast"), voter, proposal_id),
+            (vote_type, weight),
+        );
+
+        return Ok(());
+    }
+
+    Err(SavingsError::PlanNotFound)
+}
+
+/// Checks if a user has voted on a proposal
+pub fn has_voted(env: &Env, proposal_id: u64, voter: &Address) -> bool {
+    let voter_key = GovernanceKey::VoterRecord(proposal_id, voter.clone());
+    env.storage().persistent().has(&voter_key)
 }
 
 /// Checks if governance is active

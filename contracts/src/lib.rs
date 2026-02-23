@@ -817,13 +817,18 @@ impl NesteraContract {
     }
 
     /// Casts a weighted vote on a proposal
-    pub fn cast_vote(
+    pub fn vote(
         env: Env,
-        user: Address,
         proposal_id: u64,
-        support: bool,
+        vote_type: u32,
+        voter: Address,
     ) -> Result<(), SavingsError> {
-        governance::cast_vote(&env, user, proposal_id, support)
+        governance::vote(&env, proposal_id, vote_type, voter)
+    }
+
+    /// Checks if a user has voted on a proposal
+    pub fn has_voted(env: Env, proposal_id: u64, voter: Address) -> bool {
+        governance::has_voted(&env, proposal_id, &voter)
     }
 
     /// Activates governance (admin only, one-time)
@@ -851,3 +856,5 @@ mod test;
 mod transition_tests;
 #[cfg(test)]
 mod ttl_tests;
+#[cfg(test)]
+mod voting_tests;
