@@ -44,10 +44,8 @@ pub fn emit_proposal_created(env: &Env, proposal_id: u64, creator: Address, desc
         creator: creator.clone(),
         description,
     };
-    env.events().publish(
-        (symbol_short!("gov"), symbol_short!("created"), creator),
-        event,
-    );
+
+    env.events().publish((symbol_short!("gov"), symbol_short!("created"), creator), event);
 }
 
 pub fn emit_vote_cast(env: &Env, proposal_id: u64, voter: Address, vote_type: u32, weight: u128) {
@@ -57,8 +55,8 @@ pub fn emit_vote_cast(env: &Env, proposal_id: u64, voter: Address, vote_type: u3
         vote_type,
         weight,
     };
-    env.events()
-        .publish((symbol_short!("gov"), symbol_short!("voted"), voter), event);
+
+    env.events().publish((symbol_short!("gov"), symbol_short!("voted"), voter), event);
 }
 
 pub fn emit_proposal_queued(env: &Env, proposal_id: u64, queued_at: u64) {

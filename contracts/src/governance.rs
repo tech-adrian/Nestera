@@ -287,13 +287,30 @@ pub fn vote(
         }
 
         match vote_type {
-            1 => proposal.for_votes = proposal.for_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
-            2 => proposal.against_votes = proposal.against_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
-            3 => proposal.abstain_votes = proposal.abstain_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
+            1 => {
+                proposal.for_votes = proposal
+                    .for_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
+            2 => {
+                proposal.against_votes = proposal
+                    .against_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
+            3 => {
+                proposal.abstain_votes = proposal
+                    .abstain_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
             _ => return Err(SavingsError::InvalidAmount),
         }
 
-        env.storage().persistent().set(&GovernanceKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::Proposal(proposal_id), &proposal);
         env.storage().persistent().set(&voter_key, &true);
 
         emit_vote_cast(env, proposal_id, voter, vote_type, weight);
@@ -308,13 +325,30 @@ pub fn vote(
         }
 
         match vote_type {
-            1 => proposal.for_votes = proposal.for_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
-            2 => proposal.against_votes = proposal.against_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
-            3 => proposal.abstain_votes = proposal.abstain_votes.checked_add(capped_weight).ok_or(SavingsError::Overflow)?,
+            1 => {
+                proposal.for_votes = proposal
+                    .for_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
+            2 => {
+                proposal.against_votes = proposal
+                    .against_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
+            3 => {
+                proposal.abstain_votes = proposal
+                    .abstain_votes
+                    .checked_add(capped_weight)
+                    .ok_or(SavingsError::Overflow)?
+            }
             _ => return Err(SavingsError::InvalidAmount),
         }
 
-        env.storage().persistent().set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
         env.storage().persistent().set(&voter_key, &true);
 
         emit_vote_cast(env, proposal_id, voter, vote_type, weight);
@@ -323,6 +357,12 @@ pub fn vote(
     }
 
     Err(SavingsError::PlanNotFound)
+}
+
+/// Checks if a user has already voted on a proposal
+pub fn has_voted(env: &Env, proposal_id: u64, voter: &Address) -> bool {
+    let voter_key = GovernanceKey::VoterRecord(proposal_id, voter.clone());
+    env.storage().persistent().has(&voter_key)
 }
 
 /// Queues a proposal for execution after timelock
@@ -347,7 +387,9 @@ pub fn queue_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError> {
         }
 
         proposal.queued_time = now;
-        env.storage().persistent().set(&GovernanceKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::Proposal(proposal_id), &proposal);
 
         emit_proposal_queued(env, proposal_id, now);
 
@@ -372,7 +414,9 @@ pub fn queue_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError> {
         }
 
         proposal.queued_time = now;
-        env.storage().persistent().set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
 
         emit_proposal_queued(env, proposal_id, now);
 
@@ -406,7 +450,9 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
         }
 
         proposal.executed = true;
-        env.storage().persistent().set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
 
         execute_action(env, &proposal.action)?;
 
@@ -434,7 +480,9 @@ pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), SavingsError>
         }
 
         proposal.executed = true;
-        env.storage().persistent().set(&GovernanceKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::Proposal(proposal_id), &proposal);
 
         emit_proposal_executed(env, proposal_id, now);
 
@@ -472,7 +520,9 @@ fn execute_action(env: &Env, action: &ProposalAction) -> Result<(), SavingsError
             if *rate < 0 {
                 return Err(SavingsError::InvalidInterestRate);
             }
-            env.storage().instance().set(&DataKey::LockRate(*duration), rate);
+            env.storage()
+                .instance()
+                .set(&DataKey::LockRate(*duration), rate);
             Ok(())
         }
         ProposalAction::PauseContract => {
@@ -499,12 +549,14 @@ pub fn cancel_proposal(env: &Env, proposal_id: u64, caller: Address) -> Result<(
         }
 
         if proposal.executed || proposal.queued_time > 0 {
-            return Err(SavingsError::InvalidProposalState);
+            return Err(SavingsError::TooLate);
         }
 
-        // Mark as canceled (you may want a separate state field)
-        proposal.executed = true; // or add a canceled field
-        env.storage().persistent().set(&GovernanceKey::Proposal(proposal_id), &proposal);
+        // Mark as canceled (you may want a separate canceled field later)
+        proposal.executed = true;
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::Proposal(proposal_id), &proposal);
 
         emit_proposal_canceled(env, proposal_id, env.ledger().timestamp());
 
@@ -518,11 +570,13 @@ pub fn cancel_proposal(env: &Env, proposal_id: u64, caller: Address) -> Result<(
         }
 
         if proposal.executed || proposal.queued_time > 0 {
-            return Err(SavingsError::InvalidProposalState);
+            return Err(SavingsError::TooLate);
         }
 
         proposal.executed = true;
-        env.storage().persistent().set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&GovernanceKey::ActionProposal(proposal_id), &proposal);
 
         emit_proposal_canceled(env, proposal_id, env.ledger().timestamp());
 
