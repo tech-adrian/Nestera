@@ -10,34 +10,86 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 import { TransactionDto } from './dto/transaction.dto';
+import { RpcClientWrapper, RpcEndpoint } from './rpc-client.wrapper';
 
 @Injectable()
 export class StellarService implements OnModuleInit {
   private readonly logger = new Logger(StellarService.name);
-  private rpcServer: rpc.Server;
-  private horizonServer: Horizon.Server;
+  private rpcClient: RpcClientWrapper;
 
   constructor(private configService: ConfigService) {
-    const rpcUrl = this.configService.get<string>('stellar.rpcUrl') || '';
-    const horizonUrl =
-      this.configService.get<string>('stellar.horizonUrl') || '';
+    // Build RPC endpoints array
+    const rpcEndpoints: RpcEndpoint[] = [];
+    const primaryRpcUrl = this.configService.get<string>('stellar.rpcUrl');
+    if (primaryRpcUrl) {
+      rpcEndpoints.push({ url: primaryRpcUrl, priority: 0, type: 'rpc' });
+    }
 
-    this.rpcServer = new rpc.Server(rpcUrl);
-    this.horizonServer = new Horizon.Server(horizonUrl);
+    const fallbackRpcUrls =
+      this.configService.get<string[]>('stellar.rpcFallbackUrls') || [];
+    fallbackRpcUrls.forEach((url, index) => {
+      if (url) {
+        rpcEndpoints.push({ url, priority: index + 1, type: 'rpc' });
+      }
+    });
+
+    // Build Horizon endpoints array
+    const horizonEndpoints: RpcEndpoint[] = [];
+    const primaryHorizonUrl =
+      this.configService.get<string>('stellar.horizonUrl');
+    if (primaryHorizonUrl) {
+      horizonEndpoints.push({
+        url: primaryHorizonUrl,
+        priority: 0,
+        type: 'horizon',
+      });
+    }
+
+    const fallbackHorizonUrls =
+      this.configService.get<string[]>('stellar.horizonFallbackUrls') || [];
+    fallbackHorizonUrls.forEach((url, index) => {
+      if (url) {
+        horizonEndpoints.push({ url, priority: index + 1, type: 'horizon' });
+      }
+    });
+
+    // Initialize RPC client wrapper with retry configuration
+    this.rpcClient = new RpcClientWrapper(
+      rpcEndpoints,
+      horizonEndpoints,
+      {
+        maxRetries: this.configService.get<number>('stellar.rpcMaxRetries') || 3,
+        retryDelay: this.configService.get<number>('stellar.rpcRetryDelay') || 1000,
+        timeoutMs: this.configService.get<number>('stellar.rpcTimeout') || 10000,
+      },
+    );
   }
 
   onModuleInit() {
     this.logger.log('Stellar Service Initialized');
     const network = this.configService.get<string>('stellar.network');
     this.logger.log(`Target Network: ${network}`);
+
+    // Log configured endpoints
+    const status = this.rpcClient.getEndpointsStatus();
+    this.logger.log(
+      `Configured ${status.rpc.endpoints.length} RPC endpoint(s) and ${status.horizon.endpoints.length} Horizon endpoint(s)`,
+    );
   }
 
   getRpcServer() {
-    return this.rpcServer;
+    return this.rpcClient.getCurrentRpcServer();
   }
 
   getHorizonServer() {
-    return this.horizonServer;
+    return this.rpcClient.getCurrentHorizonServer();
+  }
+
+  /**
+   * Get status of all configured RPC endpoints
+   */
+  getEndpointsStatus() {
+    return this.rpcClient.getEndpointsStatus();
   }
 
   getNetworkPassphrase(): string {
@@ -47,8 +99,12 @@ export class StellarService implements OnModuleInit {
 
   async getHealth() {
     try {
-      const health = await this.rpcServer.getHealth();
-      return health;
+      return await this.rpcClient.executeWithRetry(
+        async (client) => {
+          return await (client as rpc.Server).getHealth();
+        },
+        'rpc',
+      );
     } catch (error) {
       this.logger.error('Failed to get Stellar RPC health', error);
       throw error;
@@ -84,66 +140,72 @@ export class StellarService implements OnModuleInit {
     limit = 10,
   ): Promise<TransactionDto[]> {
     try {
-      const response = await this.horizonServer
-        .transactions()
-        .forAccount(publicKey)
-        .limit(limit)
-        .order('desc')
-        .call();
+      return await this.rpcClient.executeWithRetry(
+        async (client) => {
+          const horizonServer = client as Horizon.Server;
+          const response = await horizonServer
+            .transactions()
+            .forAccount(publicKey)
+            .limit(limit)
+            .order('desc')
+            .call();
 
-      const transactions = response.records;
+          const transactions = response.records;
 
-      const results = await Promise.all(
-        transactions.map(async (tx) => {
-          // Default token / amount in case operations cannot be fetched
-          let token = 'XLM';
-          let amount = '0';
+          const results = await Promise.all(
+            transactions.map(async (tx) => {
+              // Default token / amount in case operations cannot be fetched
+              let token = 'XLM';
+              let amount = '0';
 
-          try {
-            const opsResponse = await tx.operations();
-            const ops = opsResponse.records;
+              try {
+                const opsResponse = await tx.operations();
+                const ops = opsResponse.records;
 
-            if (ops.length > 0) {
-              const op = ops[0] as unknown as Record<string, unknown>;
+                if (ops.length > 0) {
+                  const op = ops[0] as unknown as Record<string, unknown>;
 
-              // Extract amount — present on payment, path_payment, etc.
-              if (typeof op['amount'] === 'string') {
-                amount = op['amount'] as string;
+                  // Extract amount — present on payment, path_payment, etc.
+                  if (typeof op['amount'] === 'string') {
+                    amount = op['amount'] as string;
+                  }
+
+                  // Determine the asset / token type
+                  if (
+                    op['asset_type'] === 'native' ||
+                    op['asset'] instanceof Asset
+                  ) {
+                    token = 'XLM';
+                  } else if (
+                    typeof op['asset_code'] === 'string' &&
+                    op['asset_code']
+                  ) {
+                    token = op['asset_code'] as string;
+                  } else if (op['buying_asset_code']) {
+                    token = op['buying_asset_code'] as string;
+                  } else if (op['selling_asset_code']) {
+                    token = op['selling_asset_code'] as string;
+                  }
+                }
+              } catch (opError) {
+                this.logger.warn(
+                  `Could not fetch operations for tx ${tx.hash}: ${(opError as Error).message}`,
+                );
               }
 
-              // Determine the asset / token type
-              if (
-                op['asset_type'] === 'native' ||
-                op['asset'] instanceof Asset
-              ) {
-                token = 'XLM';
-              } else if (
-                typeof op['asset_code'] === 'string' &&
-                op['asset_code']
-              ) {
-                token = op['asset_code'] as string;
-              } else if (op['buying_asset_code']) {
-                token = op['buying_asset_code'] as string;
-              } else if (op['selling_asset_code']) {
-                token = op['selling_asset_code'] as string;
-              }
-            }
-          } catch (opError) {
-            this.logger.warn(
-              `Could not fetch operations for tx ${tx.hash}: ${(opError as Error).message}`,
-            );
-          }
+              return {
+                date: tx.created_at,
+                amount,
+                token,
+                hash: tx.hash,
+              } satisfies TransactionDto;
+            }),
+          );
 
-          return {
-            date: tx.created_at,
-            amount,
-            token,
-            hash: tx.hash,
-          } satisfies TransactionDto;
-        }),
+          return results;
+        },
+        'horizon',
       );
-
-      return results;
     } catch (error) {
       this.logger.error(
         `Failed to fetch transactions for ${publicKey}: ${(error as Error).message}`,

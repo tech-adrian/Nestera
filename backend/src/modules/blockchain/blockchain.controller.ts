@@ -33,4 +33,18 @@ export class BlockchainController {
   ): Promise<TransactionDto[]> {
     return this.stellarService.getRecentTransactions(publicKey);
   }
+
+  @Get('rpc/status')
+  @ApiOperation({
+    summary: 'Get status of all configured RPC endpoints',
+    description:
+      'Returns information about primary and fallback RPC/Horizon endpoints for monitoring and debugging',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status of all RPC endpoints including current active endpoint',
+  })
+  getRpcStatus() {
+    return this.stellarService.getEndpointsStatus();
+  }
 }

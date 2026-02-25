@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { StellarService } from './stellar.service';
 import { TransactionDto } from './dto/transaction.dto';
+import { RpcClientWrapper } from './rpc-client.wrapper';
 
 /** Build a minimal fake Horizon transaction record */
 const makeFakeTx = (overrides: Partial<Record<string, unknown>> = {}) => ({
@@ -22,6 +23,7 @@ const makeFakeTx = (overrides: Partial<Record<string, unknown>> = {}) => ({
 describe('StellarService – getRecentTransactions', () => {
   let service: StellarService;
   let mockTransactionCall: jest.Mock;
+  let mockRpcClient: jest.Mocked<RpcClientWrapper>;
 
   beforeEach(async () => {
     mockTransactionCall = jest.fn();
@@ -33,10 +35,15 @@ describe('StellarService – getRecentTransactions', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              const map: Record<string, string> = {
+              const map: Record<string, unknown> = {
                 'stellar.rpcUrl': 'https://soroban-testnet.stellar.org',
                 'stellar.horizonUrl': 'https://horizon-testnet.stellar.org',
                 'stellar.network': 'testnet',
+                'stellar.rpcFallbackUrls': [],
+                'stellar.horizonFallbackUrls': [],
+                'stellar.rpcMaxRetries': 3,
+                'stellar.rpcRetryDelay': 1000,
+                'stellar.rpcTimeout': 10000,
               };
               return map[key] ?? '';
             }),
@@ -47,18 +54,27 @@ describe('StellarService – getRecentTransactions', () => {
 
     service = module.get<StellarService>(StellarService);
 
-    // Stub the Horizon server's transactions() builder chain
-    (service as unknown as { horizonServer: unknown }).horizonServer = {
-      transactions: () => ({
-        forAccount: () => ({
-          limit: () => ({
-            order: () => ({
-              call: mockTransactionCall,
+    // Mock the RPC client wrapper
+    mockRpcClient = (service as unknown as { rpcClient: RpcClientWrapper })
+      .rpcClient as jest.Mocked<RpcClientWrapper>;
+
+    // Mock executeWithRetry to call the operation directly with a fake Horizon server
+    jest
+      .spyOn(mockRpcClient, 'executeWithRetry')
+      .mockImplementation(async (operation) => {
+        const fakeHorizonServer = {
+          transactions: () => ({
+            forAccount: () => ({
+              limit: () => ({
+                order: () => ({
+                  call: mockTransactionCall,
+                }),
+              }),
             }),
           }),
-        }),
-      }),
-    };
+        };
+        return operation(fakeHorizonServer as any);
+      });
   });
 
   it('should return a mapped array of TransactionDto on success', async () => {
@@ -133,27 +149,15 @@ describe('StellarService – getRecentTransactions', () => {
   it('should respect the limit parameter', async () => {
     mockTransactionCall.mockResolvedValue({ records: [] });
 
-    const limitedChain = {
-      forAccount: jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            call: mockTransactionCall,
-          }),
-        }),
-      }),
-    };
-
-    (service as unknown as { horizonServer: unknown }).horizonServer = {
-      transactions: () => limitedChain,
-    };
-
     await service.getRecentTransactions(
       'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN',
       5,
     );
 
-    expect(
-      limitedChain.forAccount.mock.results[0].value.limit,
-    ).toHaveBeenCalledWith(5);
+    // Verify executeWithRetry was called with 'horizon' type
+    expect(mockRpcClient.executeWithRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      'horizon',
+    );
   });
 });

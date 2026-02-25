@@ -11,8 +11,20 @@ export default () => ({
     network: process.env.STELLAR_NETWORK || 'testnet',
     rpcUrl: process.env.SOROBAN_RPC_URL,
     horizonUrl: process.env.HORIZON_URL,
+    // Fallback RPC URLs (comma-separated, in priority order)
+    rpcFallbackUrls: process.env.SOROBAN_RPC_FALLBACK_URLS?.split(',').map(
+      (url) => url.trim(),
+    ) || [],
+    // Fallback Horizon URLs (comma-separated, in priority order)
+    horizonFallbackUrls: process.env.HORIZON_FALLBACK_URLS?.split(',').map(
+      (url) => url.trim(),
+    ) || [],
     contractId: process.env.CONTRACT_ID,
     webhookSecret: process.env.STELLAR_WEBHOOK_SECRET,
+    // Retry configuration
+    rpcMaxRetries: parseInt(process.env.RPC_MAX_RETRIES || '3', 10),
+    rpcRetryDelay: parseInt(process.env.RPC_RETRY_DELAY || '1000', 10),
+    rpcTimeout: parseInt(process.env.RPC_TIMEOUT || '10000', 10),
   },
   redis: {
     url: process.env.REDIS_URL,
