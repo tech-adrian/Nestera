@@ -149,10 +149,7 @@ pub fn disable_strategy(
 ///
 /// # Returns
 /// `Ok(StrategyInfo)` with the strategy metadata, or `Err(StrategyNotFound)`
-pub fn get_strategy(
-    env: &Env,
-    strategy_address: Address,
-) -> Result<StrategyInfo, SavingsError> {
+pub fn get_strategy(env: &Env, strategy_address: Address) -> Result<StrategyInfo, SavingsError> {
     let info_key = StrategyKey::Info(strategy_address);
     env.storage()
         .persistent()

@@ -72,9 +72,7 @@ pub fn route_to_strategy(
         principal_deposited: amount,
         strategy_shares: 0, // placeholder, updated after call
     };
-    env.storage()
-        .persistent()
-        .set(&position_key, &position);
+    env.storage().persistent().set(&position_key, &position);
 
     // --- INTERACTIONS (external call) ---
     let client = YieldStrategyClient::new(env, &strategy_address);
@@ -105,10 +103,7 @@ pub fn route_to_strategy(
 }
 
 /// Retrieves the strategy position for a plan, if any.
-pub fn get_position(
-    env: &Env,
-    position_key: StrategyPositionKey,
-) -> Option<StrategyPosition> {
+pub fn get_position(env: &Env, position_key: StrategyPositionKey) -> Option<StrategyPosition> {
     env.storage().persistent().get(&position_key)
 }
 

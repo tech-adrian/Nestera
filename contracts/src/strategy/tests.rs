@@ -1,11 +1,8 @@
+use crate::errors::SavingsError;
 use crate::strategy::registry::{self, StrategyInfo};
 use crate::strategy::routing::{self, StrategyPositionKey};
-use crate::errors::SavingsError;
 use crate::{NesteraContract, NesteraContractClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, BytesN, Env,
-};
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 
 /// Helper: set up an env with an initialized contract and admin.
 /// Returns (env, client, admin, contract_id).
@@ -114,7 +111,8 @@ fn test_route_to_strategy_invalid_amount() {
         assert_eq!(result, Err(SavingsError::InvalidAmount));
 
         let position_key2 = StrategyPositionKey::Lock(2);
-        let result2 = routing::route_to_strategy(&env, Address::generate(&env), position_key2, -100);
+        let result2 =
+            routing::route_to_strategy(&env, Address::generate(&env), position_key2, -100);
         assert_eq!(result2, Err(SavingsError::InvalidAmount));
     });
 }

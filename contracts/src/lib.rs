@@ -881,10 +881,7 @@ impl NesteraContract {
     }
 
     /// Returns info about a registered strategy.
-    pub fn get_strategy(
-        env: Env,
-        strategy_address: Address,
-    ) -> Result<StrategyInfo, SavingsError> {
+    pub fn get_strategy(env: Env, strategy_address: Address) -> Result<StrategyInfo, SavingsError> {
         strategy::registry::get_strategy(&env, strategy_address)
     }
 
@@ -940,11 +937,7 @@ impl NesteraContract {
     ) -> Result<i128, SavingsError> {
         caller.require_auth();
         ensure_not_paused(&env)?;
-        strategy::routing::withdraw_from_strategy(
-            &env,
-            StrategyPositionKey::Lock(lock_id),
-            to,
-        )
+        strategy::routing::withdraw_from_strategy(&env, StrategyPositionKey::Lock(lock_id), to)
     }
 
     /// Withdraws funds from a group's strategy position.
@@ -956,11 +949,7 @@ impl NesteraContract {
     ) -> Result<i128, SavingsError> {
         caller.require_auth();
         ensure_not_paused(&env)?;
-        strategy::routing::withdraw_from_strategy(
-            &env,
-            StrategyPositionKey::Group(group_id),
-            to,
-        )
+        strategy::routing::withdraw_from_strategy(&env, StrategyPositionKey::Group(group_id), to)
     }
 }
 
