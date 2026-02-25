@@ -25,7 +25,7 @@ export class ClaimsService {
     return await this.claimsRepository.find({ order: { createdAt: 'DESC' } });
   }
 
-  async findOne(id: string): Promise<MedicalClaim> {
+  async findOne(id: string): Promise<MedicalClaim | null> {
     return await this.claimsRepository.findOneBy({ id });
   }
 }

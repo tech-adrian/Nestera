@@ -30,7 +30,7 @@ export class ClaimsController {
   @ApiOperation({ summary: 'Get a specific claim by ID' })
   @ApiResponse({ status: 200, description: 'Claim details', type: MedicalClaim })
   @ApiResponse({ status: 404, description: 'Claim not found' })
-  async getClaim(@Param('id') id: string): Promise<MedicalClaim> {
+  async getClaim(@Param('id') id: string): Promise<MedicalClaim | null> {
     return await this.claimsService.findOne(id);
   }
 }
