@@ -150,11 +150,12 @@ const Sidebar: React.FC = () => {
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden fixed top-4 left-4 z-[60] bg-transparent border-0 text-[#d6f6f6] cursor-pointer"
+        className="md:hidden fixed top-5 left-4 z-[60] flex items-center justify-center bg-[#0e2330] border border-white/8 rounded-xl text-[#6a9fae] hover:text-white transition-colors cursor-pointer"
+        style={{ width: 38, height: 38 }}
         onClick={() => setOpen(!open)}
         aria-label="Toggle menu"
       >
-        {open ? <X size={20} /> : <Menu size={20} />}
+        {open ? <X size={18} /> : <Menu size={18} />}
       </button>
     </>
   );

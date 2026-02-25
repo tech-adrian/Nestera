@@ -12,11 +12,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="block bg-[#061218] min-h-screen">
+    <div className="block bg-[#061218] min-h-screen overflow-x-hidden">
       <Sidebar />
 
-      {/* 260px left margin to clear the fixed sidebar on all screens */}
-      <div style={{ marginLeft: 180 }} className="min-h-screen px-6 py-5">
+      {/* Responsive margin: no margin on mobile, 180px on md+ to clear the fixed sidebar */}
+      <div className="min-h-screen px-4 py-5 md:ml-[180px] md:px-6 max-w-full">
         <TopNav />
         <div className="mt-2">{children}</div>
       </div>

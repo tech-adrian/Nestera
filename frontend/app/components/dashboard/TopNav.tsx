@@ -6,8 +6,8 @@ import { Search, Bell, HelpCircle } from "lucide-react";
 const TopNav: React.FC = () => {
   return (
     <header
-      className="sticky top-0 right-0 flex items-center justify-between bg-transparent z-40 backdrop-blur-sm"
-      style={{ height: 64, padding: "0 24px" }}
+      className="sticky top-0 right-0 flex items-center justify-between bg-transparent z-40 backdrop-blur-sm px-0 md:px-6"
+      style={{ height: 64 }}
     >
       {/* Left: heading + subtitle */}
       <div className="hidden sm:flex flex-col gap-0.5">
@@ -23,7 +23,7 @@ const TopNav: React.FC = () => {
       </div>
 
       {/* Right: icons + avatar */}
-      <div className="flex items-center" style={{ gap: 10 }}>
+      <div className="flex items-center ml-auto" style={{ gap: 10 }}>
         {[
           { Icon: Search, label: "Search" },
           { Icon: Bell, label: "Notifications" },
