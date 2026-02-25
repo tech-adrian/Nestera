@@ -20,3 +20,16 @@ export class LoginDto {
   @IsString()
   password: string;
 }
+
+export class GetNonceDto {
+  @IsString()
+  publicKey: string;
+}
+
+export class VerifySignatureDto {
+  @IsString()
+  publicKey: string;
+
+  @IsString()
+  signature: string;
+}

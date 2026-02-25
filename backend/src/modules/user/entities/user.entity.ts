@@ -20,6 +20,9 @@ export class User {
   @Column({ nullable: true })
   password?: string;
 
+  @Column({ unique: true, nullable: true })
+  publicKey?: string;
+
   @Column({ type: 'text', nullable: true })
   bio: string;
 

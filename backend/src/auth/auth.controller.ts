@@ -1,6 +1,6 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, GetNonceDto, VerifySignatureDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -15,5 +15,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Get('nonce')
+  getNonce(@Query('publicKey') publicKey: string) {
+    return this.authService.generateNonce(publicKey);
+  }
+
+  @Post('verify-signature')
+  @HttpCode(HttpStatus.OK)
+  verifySignature(@Body() dto: VerifySignatureDto) {
+    return this.authService.verifySignature(dto);
   }
 }

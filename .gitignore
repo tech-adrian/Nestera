@@ -13,3 +13,7 @@ PR_DESCRIPTION.md
 PR_DESCRIPTION_ISSUE75.md
 PR_DESCRIPTION_ISSUE74.md
 /generated/prisma
+
+.agent/
+.agents/
+issue.md

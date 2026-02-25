@@ -39,6 +39,13 @@ export class UserService {
     return user;
   }
 
+  async findByPublicKey(publicKey: string) {
+    const user = await this.userRepository.findOne({
+      where: { publicKey },
+    });
+    return user;
+  }
+
   async create(data: Partial<User>) {
     const newEntity = this.userRepository.create(data);
     const savedUser = await this.userRepository.save(newEntity);

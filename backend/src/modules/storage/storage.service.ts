@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join, extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class StorageService {
@@ -20,7 +20,7 @@ export class StorageService {
   async saveFile(file: Express.Multer.File): Promise<string> {
     try {
       const fileExtension = extname(file.originalname);
-      const fileName = `${uuidv4()}${fileExtension}`;
+      const fileName = `${randomUUID()}${fileExtension}`;
       const filePath = join(this.uploadDir, fileName);
 
       writeFileSync(filePath, file.buffer);
