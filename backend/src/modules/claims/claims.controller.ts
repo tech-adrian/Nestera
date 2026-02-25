@@ -7,7 +7,7 @@ import { MedicalClaim } from './entities/medical-claim.entity';
 @ApiTags('claims')
 @Controller('claims')
 export class ClaimsController {
-  constructor(private readonly claimsService: ClaimsService) {}
+  constructor(private readonly claimsService: ClaimsService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -32,5 +32,27 @@ export class ClaimsController {
   @ApiResponse({ status: 404, description: 'Claim not found' })
   async getClaim(@Param('id') id: string): Promise<MedicalClaim | null> {
     return await this.claimsService.findOne(id);
+  }
+
+  @Post(':id/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify claim with hospital' })
+  @ApiResponse({ status: 200, description: 'Claim verified with hospital', type: MedicalClaim })
+  @ApiResponse({ status: 404, description: 'Claim not found' })
+  @ApiResponse({ status: 503, description: 'Hospital service unavailable' })
+  async verifyClaimWithHospital(@Param('id') id: string): Promise<MedicalClaim> {
+    return await this.claimsService.verifyClaimWithHospital(id);
+  }
+
+  @Get(':id/hospital-data')
+  @ApiOperation({ summary: 'Fetch claim data from hospital' })
+  @ApiResponse({ status: 200, description: 'Hospital claim data retrieved' })
+  @ApiResponse({ status: 404, description: 'Claim not found or hospital endpoint not configured' })
+  async fetchHospitalClaimData(@Param('id') id: string) {
+    const claim = await this.claimsService.findOne(id);
+    if (!claim) {
+      throw new Error('Claim not found');
+    }
+    return await this.claimsService.fetchHospitalClaimData(claim.hospitalId, id);
   }
 }

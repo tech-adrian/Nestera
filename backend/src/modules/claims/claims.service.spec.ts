@@ -3,16 +3,26 @@ import { ClaimsService } from './claims.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MedicalClaim, ClaimStatus } from './entities/medical-claim.entity';
 import { Repository } from 'typeorm';
+import { HospitalIntegrationService } from '../hospital-integration/hospital-integration.service';
 
 describe('ClaimsService', () => {
   let service: ClaimsService;
   let repository: Repository<MedicalClaim>;
+  let hospitalIntegrationService: HospitalIntegrationService;
 
   const mockRepository = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
     findOneBy: jest.fn(),
+  };
+
+  const mockHospitalIntegrationService = {
+    fetchClaimData: jest.fn(),
+    verifyClaimWithHospital: jest.fn(),
+    fetchPatientHistory: jest.fn(),
+    getCircuitBreakerStatus: jest.fn(),
+    resetCircuitBreaker: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -23,11 +33,16 @@ describe('ClaimsService', () => {
           provide: getRepositoryToken(MedicalClaim),
           useValue: mockRepository,
         },
+        {
+          provide: HospitalIntegrationService,
+          useValue: mockHospitalIntegrationService,
+        },
       ],
     }).compile();
 
     service = module.get<ClaimsService>(ClaimsService);
     repository = module.get<Repository<MedicalClaim>>(getRepositoryToken(MedicalClaim));
+    hospitalIntegrationService = module.get<HospitalIntegrationService>(HospitalIntegrationService);
   });
 
   it('should be defined', () => {
