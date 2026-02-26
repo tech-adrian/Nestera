@@ -965,6 +965,40 @@ impl NesteraContract {
         ensure_not_paused(&env)?;
         strategy::routing::withdraw_from_strategy(&env, StrategyPositionKey::Group(group_id), to)
     }
+
+    /// Harvests yield from a yield strategy.
+    ///
+    /// Calculates profit as `strategy_balance - principal`, calls `strategy_harvest`,
+    /// allocates the protocol fee to treasury, and credits the remainder to users.
+    ///
+    /// Returns the total yield harvested (treasury fee + user yield).
+    pub fn harvest_strategy(
+        env: Env,
+        caller: Address,
+        strategy_address: Address,
+    ) -> Result<i128, SavingsError> {
+        caller.require_auth();
+        ensure_not_paused(&env)?;
+        strategy::routing::harvest_strategy(&env, strategy_address)
+    }
+
+    /// Returns the total principal that Nestera has deposited into a given strategy.
+    ///
+    /// This is the sum of all routed deposits minus all withdrawals.
+    pub fn get_strategy_principal(env: Env, strategy_address: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::StrategyTotalPrincipal(strategy_address))
+            .unwrap_or(0)
+    }
+
+    /// Returns the accumulated user yield credited from harvesting a given strategy.
+    pub fn get_strategy_yield(env: Env, strategy_address: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::StrategyYield(strategy_address))
+            .unwrap_or(0)
+    }
 }
 
 #[cfg(test)]

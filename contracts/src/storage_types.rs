@@ -147,6 +147,10 @@ pub enum DataKey {
     EarlyBreakFeeBps,
     /// Fee recipient for protocol/treasury fees
     FeeRecipient,
+    /// Track total principal deposited in a strategy (deposits - withdrawals)
+    StrategyTotalPrincipal(Address),
+    /// Track accumulated yield designated for Nestera users from a strategy
+    StrategyYield(Address),
     User(Address),
     /// Maps a (user address, plan_id) tuple to a SavingsPlan
     SavingsPlan(Address, u64),
