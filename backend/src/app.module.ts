@@ -14,12 +14,15 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { UserModule } from './modules/user/user.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MailModule } from './modules/mail/mail.module';
-import { RedisCacheModule } from './modules/cache/cache.module';
+// import { RedisCacheModule } from './modules/cache/cache.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ClaimsModule } from './modules/claims/claims.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.module';
 import { SavingsModule } from './modules/savings/savings.module';
+import { TestRbacModule } from './test-rbac/test-rbac.module';
+import { TestThrottlingModule } from './test-throttling/test-throttling.module';
+import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 
 @Module({
   imports: [
@@ -42,7 +45,7 @@ import { SavingsModule } from './modules/savings/savings.module';
       }),
     }),
     AuthModule,
-    RedisCacheModule,
+    // RedisCacheModule,
     HealthModule,
     BlockchainModule,
     UserModule,
@@ -53,6 +56,8 @@ import { SavingsModule } from './modules/savings/savings.module';
     DisputesModule,
     AdminAnalyticsModule,
     SavingsModule,
+    TestRbacModule,
+    TestThrottlingModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

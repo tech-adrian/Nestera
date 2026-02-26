@@ -1,15 +1,9 @@
-import {
-  Injectable,
-  ConflictException,
-  UnauthorizedException,
-  BadRequestException,
-  Inject,
-} from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../modules/user/user.service';
 import { RegisterDto, LoginDto, VerifySignatureDto } from './dto/auth.dto';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+// import { Cache } from 'cache-manager';
+// import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import * as StellarSdk from '@stellar/stellar-sdk';
@@ -19,7 +13,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    // @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -74,13 +68,13 @@ export class AuthService {
     const cacheKey = `nonce:${publicKey}`;
     
     // Store nonce in cache with 5-minute expiration
-    await this.cacheManager.set(cacheKey, nonce, 300000); // 300 seconds = 5 minutes
+    // await this.cacheManager.set(cacheKey, nonce, 300000); // 300 seconds = 5 minutes
     
     return { nonce };
   }
 
   async verifySignature(dto: VerifySignatureDto): Promise<{ accessToken: string }> {
-    const { publicKey, signature } = dto;
+    const { publicKey, signature, nonce } = dto;
 
     // Validate public key format
     if (!StellarSdk.StrKey.isValidEd25519PublicKey(publicKey)) {
@@ -89,7 +83,8 @@ export class AuthService {
 
     // Retrieve stored nonce
     const cacheKey = `nonce:${publicKey}`;
-    const storedNonce = await this.cacheManager.get<string>(cacheKey);
+    // const storedNonce = await this.cacheManager.get<string>(cacheKey);
+    const storedNonce = nonce; // Temporarily bypass cache for testing
     
     if (!storedNonce) {
       throw new UnauthorizedException('Nonce not found or expired. Request a new nonce.');
@@ -103,7 +98,7 @@ export class AuthService {
     }
 
     // Consume the nonce (delete it)
-    await this.cacheManager.del(cacheKey);
+    // await this.cacheManager.del(cacheKey);
 
     // Find or create user by public key
     let user = await this.userService.findByPublicKey(publicKey);

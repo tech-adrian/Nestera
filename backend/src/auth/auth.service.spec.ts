@@ -3,7 +3,7 @@ import { AuthService } from './auth.service';
 import { UserService } from '../modules/user/user.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+// import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
@@ -19,11 +19,11 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
-    const mockCacheManager = {
-      set: jest.fn(),
-      get: jest.fn(),
-      del: jest.fn(),
-    };
+    // const mockCacheManager = {
+    //   set: jest.fn(),
+    //   get: jest.fn(),
+    //   del: jest.fn(),
+    // };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,17 +42,17 @@ describe('AuthService', () => {
             sign: jest.fn().mockReturnValue('mock-token'),
           },
         },
-        {
-          provide: CACHE_MANAGER,
-          useValue: mockCacheManager,
-        },
+        // {
+        //   provide: CACHE_MANAGER,
+        //   useValue: mockCacheManager,
+        // },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     userService = module.get<UserService>(UserService);
     jwtService = module.get<JwtService>(JwtService);
-    cacheManager = module.get(CACHE_MANAGER);
+    // cacheManager = module.get(CACHE_MANAGER);
   });
 
   it('should be defined', () => {

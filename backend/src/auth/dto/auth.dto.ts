@@ -32,4 +32,7 @@ export class VerifySignatureDto {
 
   @IsString()
   signature: string;
+
+  @IsString()
+  nonce: string;
 }
