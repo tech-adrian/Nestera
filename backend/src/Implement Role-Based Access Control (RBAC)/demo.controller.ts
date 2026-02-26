@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
-import { Role } from '../auth/roles.enum';
+import { Roles } from './roles.decorator';
+import { RolesGuard } from './roles.guard';
+import { Role } from './roles.enum';
 
 /**
  * Simulates the object that a real auth guard (e.g. JwtAuthGuard) would attach
@@ -15,7 +15,11 @@ import { Request as ExpressRequest, Response, NextFunction } from 'express';
 
 @Injectable()
 export class FakeAuthMiddleware implements NestMiddleware {
-  use(req: ExpressRequest & { user?: any }, _res: Response, next: NextFunction) {
+  use(
+    req: ExpressRequest & { user?: any },
+    _res: Response,
+    next: NextFunction,
+  ) {
     const role = (req.query.role as string)?.toUpperCase() ?? Role.USER;
     req.user = { id: 1, username: 'testuser', role };
     next();
@@ -24,10 +28,9 @@ export class FakeAuthMiddleware implements NestMiddleware {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-@UseGuards(RolesGuard)          // apply guard to every route in this controller
+@UseGuards(RolesGuard) // apply guard to every route in this controller
 @Controller('demo')
 export class DemoController {
-
   /** Accessible by any authenticated user (no @Roles restriction) */
   @Get('public')
   publicRoute() {
@@ -52,6 +55,8 @@ export class DemoController {
   @Roles(Role.USER, Role.ADMIN)
   @Get('shared')
   shared(@Request() req: any) {
-    return { message: `Hello, ${req.user.username}! Your role is ${req.user.role}.` };
+    return {
+      message: `Hello, ${req.user.username}! Your role is ${req.user.role}.`,
+    };
   }
 }

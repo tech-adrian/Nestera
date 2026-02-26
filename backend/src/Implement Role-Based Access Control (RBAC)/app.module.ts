@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { DemoController, FakeAuthMiddleware } from './demo/demo.controller';
+import { DemoController, FakeAuthMiddleware } from './demo.controller';
 
 @Module({
   controllers: [DemoController],
